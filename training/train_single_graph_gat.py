@@ -17,7 +17,9 @@ edge_index = np.load(os.path.join(base_dir, "corr_edge_index.npy"))
 num_nodes = len(labels)
 
 # Node features فعلاً ساده: یک ویژگی ثابت (بعداً بهترش می‌کنیم)
-x = torch.ones((num_nodes, 1), dtype=torch.float)
+features = np.load(os.path.join(base_dir, "corr_features.npy"))
+x = torch.tensor(features, dtype=torch.float)
+
 edge_index = torch.tensor(edge_index, dtype=torch.long)
 y = torch.tensor(labels, dtype=torch.long)
 
@@ -31,7 +33,7 @@ data = data.to(device)
 # Define GAT Model (Professional)
 # -----------------------
 class GAT(torch.nn.Module):
-    def __init__(self, in_channels=1, hidden=8, heads=4, dropout=0.2):
+    def __init__(self, in_channels=3, hidden=8, heads=4, dropout=0.2):
         super().__init__()
         self.dropout = dropout
         self.gat1 = GATConv(in_channels, hidden, heads=heads, dropout=dropout)

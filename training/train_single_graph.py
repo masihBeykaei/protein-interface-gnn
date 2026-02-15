@@ -16,7 +16,9 @@ edge_index = np.load(os.path.join(base_dir, "corr_edge_index.npy"))
 # Node features ساده: فعلاً فقط یک ویژگی 1 ثابت
 # (بعداً می‌تونیم ویژگی‌های بهتر اضافه کنیم)
 num_nodes = len(labels)
-x = torch.ones((num_nodes, 1), dtype=torch.float)
+features = np.load(os.path.join(base_dir, "corr_features.npy"))
+x = torch.tensor(features, dtype=torch.float)
+
 
 edge_index = torch.tensor(edge_index, dtype=torch.long)
 y = torch.tensor(labels, dtype=torch.long)
@@ -32,7 +34,7 @@ data = data.to(device)
 class GCN(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = GCNConv(1, 16)
+        self.conv1 = GCNConv(3, 16)
         self.conv2 = GCNConv(16, 2)
 
     def forward(self, data):

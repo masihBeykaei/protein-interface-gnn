@@ -248,6 +248,9 @@ if __name__ == "__main__":
     adjA = build_adjacency_list(edge_index_A, len(resA_atoms))
     adjB = build_adjacency_list(edge_index_B, len(resB_atoms))
 
+    degree_A = np.array([len(neighbors) for neighbors in adjA])
+    degree_B = np.array([len(neighbors) for neighbors in adjB])
+
     # Candidate filtering (optional but recommended)
     if USE_CANDIDATE_FILTER and CANDIDATE_RADIUS is not None:
         idx_A, idx_B = candidate_filter(caA, caB, CANDIDATE_RADIUS)
@@ -263,6 +266,18 @@ if __name__ == "__main__":
     labels, pairs, nA_local, nB_local = build_correspondence_nodes_and_labels(
         resA_atoms, resB_atoms, idx_A, idx_B, CONTACT_THRESHOLD
     )
+    # Build node features
+    features = []
+
+    for (a_idx, b_idx) in pairs:
+        ca_dist = np.linalg.norm(caA[a_idx] - caB[b_idx])
+        degA = degree_A[a_idx]
+        degB = degree_B[b_idx]
+
+        features.append([ca_dist, degA, degB])
+
+    features = np.array(features, dtype=np.float32)
+
 
     print("\n=== Node/Label Results ===")
     print("Total correspondence nodes:", len(labels))
@@ -277,6 +292,8 @@ if __name__ == "__main__":
     print("\n=== Edge Results ===")
     print("Correspondence edges:", corr_edge_index.shape[1])
 
+    
+
     # Optional: save intermediate outputs (numpy)
     out_dir = os.path.join("data", "processed")
     os.makedirs(out_dir, exist_ok=True)
@@ -284,5 +301,6 @@ if __name__ == "__main__":
     np.save(os.path.join(out_dir, "corr_labels.npy"), labels)
     np.save(os.path.join(out_dir, "corr_pairs.npy"), pairs)
     np.save(os.path.join(out_dir, "corr_edge_index.npy"), corr_edge_index)
+    np.save(os.path.join(out_dir, "corr_features.npy"), features)
 
-    print(f"\nSaved to {out_dir}: corr_labels.npy, corr_pairs.npy, corr_edge_index.npy")
+    print(f"\nSaved to {out_dir}: corr_labels.npy, corr_pairs.npy, corr_edge_index.npy, corr_features.npy")

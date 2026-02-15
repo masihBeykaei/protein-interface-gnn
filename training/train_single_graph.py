@@ -52,7 +52,11 @@ model.train()
 for epoch in range(201):
     optimizer.zero_grad()
     out = model(data)
-    loss = F.cross_entropy(out, data.y)
+
+    class_counts = torch.bincount(data.y)
+    weight = 1.0 / class_counts.float()
+    loss = F.cross_entropy(out, data.y, weight=weight.to(device))
+
     loss.backward()
     optimizer.step()
 

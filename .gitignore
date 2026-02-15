@@ -7,6 +7,7 @@ __pycache__/
 # Virtual Environment
 venv/
 .env/
+venv310/
 
 # Numpy outputs
 *.npy

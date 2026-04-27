@@ -16,6 +16,7 @@ Steps implemented so far:
 - Candidate filtering to reduce graph size
 - GPU training with PyTorch
 - Baseline GCN model with class weighting
+- Tuned GAT with full recall on 1BRS
 
 ---
 
@@ -28,28 +29,41 @@ For each protein complex:
 3. Generate correspondence graph
 4. Label interacting residue pairs using atomic distance (< 5Å)
 5. Apply candidate filtering to reduce imbalance
+6. Build node features: [Cα distance, degree in A, degree in B]
+
+Files saved in `data/processed/`:
+
+- `corr_labels.npy`
+- `corr_pairs.npy`
+- `corr_edge_index.npy`
+- `corr_features.npy`
 
 ---
 
-## 🧠 Model
+## 🧠 Models
 
-Current baseline:
+### GCN (baseline)
 
 - 2-layer GCN
-- CrossEntropy with class weighting
-- Evaluated using Precision, Recall, F1-score
+- Class weighting to handle imbalance
+- Precision/Recall/F1 reported for each class
+
+### GAT (tuned)
+
+- 2-layer GAT with 16 hidden units, 4 attention heads, dropout=0.2
+- Class weighting: `[1, 10]` to emphasize positive nodes
+- Achieved **full recall (1.0) on positive nodes** for 1BRS
 
 ---
 
-## 📊 Current Results (1BRS Example)
+## 📊 Example Results (1BRS)
 
-| Metric | Class 0 | Class 1 |
-|--------|---------|---------|
-| Precision | 0.95 | 0.11 |
-| Recall | 0.66 | 0.56 |
-| F1-score | 0.77 | 0.18 |
+| Model      | Precision 0 | Recall 0 | F1 0 | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|------------|-------------|----------|------|-------------|----------|------|----------|
+| GCN        | 0.9615      | 0.5981   | 0.7375 | 0.1158      | 0.6875   | 0.1982 | 0.6044 |
+| GAT tuned  | 1.0000      | 0.2153   | 0.3543 | 0.0889      | 1.0000   | 0.1633 | 0.2711 |
 
-Shows significant improvement in recall after applying class weighting.
+> Note: Accuracy is misleading due to strong class imbalance; recall/F1 for positive class is more informative.
 
 ---
 
@@ -59,20 +73,22 @@ Shows significant improvement in recall after applying class weighting.
 - CUDA-enabled GPU (tested on RTX 2070)
 - PyTorch (CUDA 12.1)
 - PyTorch Geometric
-
+- Biopython, numpy, scikit-learn
 
 
 ## 📂 Project Structure
 - preprocessing/   # Dataset pipeline
-- training/        # Training scripts
-- models/          # GNN models
-- data/            # PDB and processed data
+- training/        # Training scripts (GCN and GAT)
+- models/          # GNN model definitions
+- data/            # PDB raw files and processed dataset (labels, pairs, features, edge_index)
 
 
 ## 🔜 Next Steps
-- Implement Graph Attention Network (GAT)
-- Compare GCN vs GAT
-- Extend training to multiple protein complexes
+- 1.Run the pipeline on additional proteins (2PTC, 1AK4, 1FSS) to create a multi-protein dataset
+- 2.Train and compare GCN vs GAT on the full dataset
+- 3.Visualize attention maps for GAT and analyze false positives
+- 4.Optimize node features to improve recall/precision
+- 5.Prepare final results, plots, and documentation for reporting
 
 
 Install:

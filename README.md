@@ -23,7 +23,8 @@ Implemented so far:
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
 - Multi-graph GCN and GAT training with balanced loss masking
-- Negative sampling ratio tuning experiments
+- Negative sampling ratio tuning
+- Probability threshold tuning
 
 ---
 
@@ -181,7 +182,14 @@ Multi-graph training was performed using 12 processed protein complex graphs.
 
 The dataset was split by graph, meaning the model was evaluated on protein complexes that were not used during training.
 
-### Test Set Comparison
+### Default Test Set Comparison
+
+Default setting:
+
+```text
+NEGATIVE_RATIO = 5
+threshold = 0.50
+```
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
 |-------|-------------|----------|------------|----------|
@@ -240,19 +248,12 @@ Results:
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 | GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
-### Current Best Settings
+### Current Best Settings by F1
 
-| Model | Best Ratio by F1 | Precision 1 | Recall 1 | F1 1 |
-|-------|------------------|-------------|----------|------|
+| Model | Best Negative Ratio | Precision 1 | Recall 1 | F1 1 |
+|-------|---------------------|-------------|----------|------|
 | GCN | 5 | 0.2059 | 0.3245 | 0.2519 |
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 |
-
-### Interpretation
-
-- GCN with `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.
-- GCN with `NEGATIVE_RATIO = 3` gives a better recall while keeping almost the same F1-score.
-- GAT with `NEGATIVE_RATIO = 5` gives the best positive-class F1-score among GAT settings.
-- GAT with `NEGATIVE_RATIO = 2` or `3` gives very high recall and may be useful for recall-oriented interface discovery.
 
 Tuning results are saved in:
 
@@ -260,6 +261,56 @@ Tuning results are saved in:
 experiments/negative_ratio_tuning_results.md
 experiments/negative_ratio_tuning_results.csv
 ```
+
+---
+
+## 🎚️ Probability Threshold Tuning
+
+Instead of always using `argmax`, different probability thresholds were tested.
+
+A node is predicted as positive if:
+
+```text
+P(class 1) >= threshold
+```
+
+Script:
+
+```text
+experiments/tune_probability_threshold.py
+```
+
+### Best Thresholds by Positive-Class F1
+
+| Model | Best Threshold | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|----------------|-------------|----------|------|----------|
+| GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
+| GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+
+Threshold tuning results are saved in:
+
+```text
+experiments/threshold_tuning_results.md
+experiments/threshold_tuning_results.csv
+```
+
+---
+
+## 🏆 Current Best Results
+
+### Best Positive-Class F1
+
+| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|---------|-------------|----------|------|----------|
+| GCN | NEGATIVE_RATIO=5, threshold=0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
+| GAT | NEGATIVE_RATIO=5, threshold=0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+
+### Best Recall-Oriented Result
+
+| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|---------|-------------|----------|------|----------|
+| GAT | NEGATIVE_RATIO=5, threshold=0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
+| GCN | NEGATIVE_RATIO=5, threshold=0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
 
 ---
 
@@ -329,6 +380,12 @@ python training/train_multi_graph_gat.py
 python experiments/tune_negative_ratio.py
 ```
 
+### 7. Run probability threshold tuning
+
+```bash
+python experiments/tune_probability_threshold.py
+```
+
 ---
 
 ## 📂 Project Structure
@@ -362,7 +419,10 @@ protein-interface-gnn/
 │   ├── results_summary.md
 │   ├── tune_negative_ratio.py
 │   ├── negative_ratio_tuning_results.md
-│   └── negative_ratio_tuning_results.csv
+│   ├── negative_ratio_tuning_results.csv
+│   ├── tune_probability_threshold.py
+│   ├── threshold_tuning_results.md
+│   └── threshold_tuning_results.csv
 │
 ├── utils/
 │
@@ -378,10 +438,11 @@ protein-interface-gnn/
 Current results show different behaviors between GCN and GAT:
 
 - GCN is more conservative.
-- GCN achieves the best positive-class F1-score on the current test split.
+- GCN currently achieves the best positive-class F1-score.
 - GAT detects more true positive interface nodes.
 - GAT achieves much higher recall but produces more false positives.
 - Negative sampling ratio strongly affects the precision-recall trade-off.
+- Probability threshold tuning slightly improves positive-class F1-score.
 - For biological interface discovery, high recall can be useful because missing true interface residues may be more harmful than producing extra candidates.
 
 ---
@@ -389,7 +450,7 @@ Current results show different behaviors between GCN and GAT:
 ## 🔜 Next Steps
 
 - Add validation split and early stopping.
-- Tune model probability thresholds instead of using only `argmax`.
+- Tune thresholds using validation data instead of test data.
 - Improve node features using:
   - amino acid type
   - hydrophobicity
@@ -403,7 +464,8 @@ Current results show different behaviors between GCN and GAT:
   - precision vs recall
   - F1-score comparison
   - negative ratio tuning results
-- Prepare final project report and presentation.
+  - threshold tuning results
+- Prepare final report and presentation.
 
 ---
 

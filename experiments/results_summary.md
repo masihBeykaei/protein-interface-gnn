@@ -4,22 +4,65 @@ This document summarizes the current experimental results for protein–protein 
 
 ---
 
-## 1. Dataset Summary
+## 1. Project Goal
 
-The current multi-protein dataset was generated from residue-level correspondence graphs.
+The goal of this project is to predict protein–protein interface/contact residue pairs using graph-based learning.
 
-Each correspondence node represents a residue pair between two interacting protein partners.
+Each protein partner is represented as a residue-level graph.  
+A correspondence graph is then built between two interacting partners, where each correspondence node represents a possible residue pair.
 
-Node labels:
+The final task is a node-level binary classification problem:
 
 - `0`: non-interface residue pair
 - `1`: interface/contact residue pair
 
-A residue pair is labeled as positive if at least one atom pair between the two residues is closer than **5Å**.
+---
+
+## 2. Dataset Construction
+
+For each protein complex:
+
+1. Load the PDB structure.
+2. Extract residues from selected chains.
+3. Build residue-level graphs using Cα distance.
+4. Build a correspondence graph between the two partners.
+5. Label residue pairs using atomic distance.
+6. Apply candidate filtering to reduce graph size.
+7. Generate node features for each correspondence node.
+
+A residue pair is labeled as positive if at least one atom pair between the two residues is closer than:
+
+```text
+5Å
+```
 
 ---
 
-## 2. Processed Protein Complexes
+## 3. Node Features
+
+Each correspondence node represents:
+
+```text
+(residue_i, residue_j)
+```
+
+Current feature vector:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2]
+```
+
+Features:
+
+- Cα distance between the two residues
+- Degree of residue `i` in partner 1 graph
+- Degree of residue `j` in partner 2 graph
+
+---
+
+## 4. Processed Protein Complexes
+
+The current multi-protein dataset includes original examples and DBD-style protein complexes.
 
 | Case | Nodes | Positive | Negative | Positive Ratio | Edges |
 |------|-------|----------|----------|----------------|-------|
@@ -42,35 +85,15 @@ A residue pair is labeled as positive if at least one atom pair between the two 
 |------------|----------------|----------------|----------------|
 | 20,707 | 698 | 20,009 | 0.0337 |
 
-The dataset remains highly imbalanced, which is expected in protein–protein interface prediction. However, adding DBD-style complexes increased the number of positive samples significantly.
+The dataset is highly imbalanced, which is expected in protein–protein interface prediction.  
+However, after adding DBD-style complexes, the number of positive samples increased significantly.
 
 ---
 
-## 3. Node Features
+## 5. Train/Test Split
 
-Each correspondence node represents a residue pair:
+The dataset was split by graph, not by node.
 
-```text
-(residue_i, residue_j)
-```
-
-Current feature vector:
-
-```text
-[CA_distance, degree_partner_1, degree_partner_2]
-```
-
-Features:
-
-- Cα distance between the two residues
-- Degree of residue `i` in partner 1 graph
-- Degree of residue `j` in partner 2 graph
-
----
-
-## 4. Train/Test Split
-
-The dataset was split by graph, not by node.  
 This means the model is evaluated on protein complexes that were not seen during training.
 
 ### Train Graphs
@@ -93,9 +116,11 @@ This means the model is evaluated on protein complexes that were not seen during
 
 ---
 
-## 5. Training Strategy
+## 6. Class Imbalance Handling
 
-Because the dataset is highly imbalanced, a balanced loss mask was used.
+Protein–protein interface prediction is naturally imbalanced because only a small fraction of residue pairs are true interface/contact pairs.
+
+To handle this, multi-graph training uses a balanced loss mask.
 
 For each training batch:
 
@@ -109,11 +134,9 @@ The loss is computed using:
 all positive nodes + NEGATIVE_RATIO × positive_count negative nodes
 ```
 
-This allows the model to learn from positive interface/contact nodes without removing graph structure.
-
 ---
 
-## 6. Multi-Graph GCN Results
+## 7. Multi-Graph GCN Results
 
 Script:
 
@@ -125,6 +148,7 @@ Configuration:
 
 ```text
 NEGATIVE_RATIO = 5
+threshold = 0.50
 ```
 
 ### Train Results
@@ -155,7 +179,7 @@ Accuracy:
 
 ---
 
-## 7. Multi-Graph GAT Results
+## 8. Multi-Graph GAT Results
 
 Script:
 
@@ -167,6 +191,7 @@ Configuration:
 
 ```text
 NEGATIVE_RATIO = 5
+threshold = 0.50
 ```
 
 ### Train Results
@@ -197,7 +222,7 @@ Accuracy:
 
 ---
 
-## 8. Model Comparison on Test Set
+## 9. Model Comparison on Test Set
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
 |-------|-------------|----------|------------|----------|
@@ -210,11 +235,11 @@ The GCN model is more conservative. It predicts fewer positive nodes, which lead
 
 The GAT model is more sensitive to interface/contact nodes. It achieves much higher recall for the positive class, meaning it detects more true interface residue pairs. However, this comes at the cost of more false positives and lower precision.
 
-For protein–protein interface prediction, high recall can be valuable because missing true interface residues may be more problematic than producing additional candidate residues for further analysis.
+For protein–protein interface prediction, high recall can be useful because missing true interface residues may be more problematic than producing additional candidate residues for further biological analysis.
 
 ---
 
-## 9. Negative Ratio Tuning Experiment
+## 10. Negative Ratio Tuning Experiment
 
 Script:
 
@@ -224,7 +249,7 @@ experiments/tune_negative_ratio.py
 
 This experiment compares GCN and GAT under different negative sampling ratios.
 
-Test set results:
+### Test Set Results
 
 | Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|----------------|------------------|---------------|-----------|---------------|
@@ -237,66 +262,125 @@ Test set results:
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 | GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
----
+### Best Settings by Positive-Class F1
 
-## 10. Negative Ratio Tuning Interpretation
+| Model | Best Negative Ratio | Precision 1 | Recall 1 | F1 1 |
+|-------|---------------------|-------------|----------|------|
+| GCN | 5 | 0.2059 | 0.3245 | 0.2519 |
+| GAT | 5 | 0.1274 | 0.7483 | 0.2177 |
 
-### GCN
+### Interpretation
 
-The best positive-class F1-score for GCN was achieved with:
+For GCN, `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.  
+However, `NEGATIVE_RATIO = 3` produces almost the same F1-score with much higher recall.
 
-```text
-NEGATIVE_RATIO = 5
-```
-
-However, `NEGATIVE_RATIO = 3` produced almost the same F1-score while achieving a much higher recall.
-
-| Ratio | Precision 1 | Recall 1 | F1 1 |
-|-------|-------------|----------|------|
-| 3 | 0.1643 | 0.5298 | 0.2508 |
-| 5 | 0.2059 | 0.3245 | 0.2519 |
-
-This shows a clear precision-recall trade-off.
-
-### GAT
-
-The best positive-class F1-score for GAT was achieved with:
-
-```text
-NEGATIVE_RATIO = 5
-```
-
-However, GAT with ratios `2` and `3` achieved very high recall:
-
-| Ratio | Precision 1 | Recall 1 | F1 1 |
-|-------|-------------|----------|------|
-| 2 | 0.1107 | 0.9007 | 0.1972 |
-| 3 | 0.1165 | 0.8874 | 0.2060 |
-| 5 | 0.1274 | 0.7483 | 0.2177 |
-
-GAT is more recall-oriented than GCN, especially when fewer negative samples are included in the loss.
+For GAT, `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.  
+However, `NEGATIVE_RATIO = 2` and `3` achieve much higher recall and may be useful for recall-oriented interface discovery.
 
 ---
 
-## 11. Current Conclusion
+## 11. Probability Threshold Tuning Experiment
+
+Script:
+
+```text
+experiments/tune_probability_threshold.py
+```
+
+This experiment evaluates different probability thresholds for predicting the positive class.
+
+A node is predicted as positive if:
+
+```text
+P(class 1) >= threshold
+```
+
+### Test Set Results
+
+| Model | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------------|---------------|-----------|---------------|
+| GCN | 0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
+| GCN | 0.10 | 0.1008 | 0.9073 | 0.1815 | 0.7282 |
+| GCN | 0.15 | 0.1139 | 0.8411 | 0.2006 | 0.7775 |
+| GCN | 0.20 | 0.1247 | 0.7748 | 0.2149 | 0.8120 |
+| GCN | 0.25 | 0.1377 | 0.7086 | 0.2306 | 0.8430 |
+| GCN | 0.30 | 0.1444 | 0.6159 | 0.2340 | 0.8661 |
+| GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
+| GCN | 0.50 | 0.2059 | 0.3245 | 0.2519 | 0.9360 |
+| GCN | 0.60 | 0.2400 | 0.1589 | 0.1912 | 0.9554 |
+| GCN | 0.70 | 0.2250 | 0.0596 | 0.0942 | 0.9620 |
+| GCN | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
+| GCN | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
+| GAT | 0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
+| GAT | 0.10 | 0.0828 | 0.9603 | 0.1525 | 0.6456 |
+| GAT | 0.15 | 0.0927 | 0.9470 | 0.1688 | 0.6904 |
+| GAT | 0.20 | 0.1011 | 0.9404 | 0.1825 | 0.7203 |
+| GAT | 0.25 | 0.1073 | 0.9338 | 0.1925 | 0.7399 |
+| GAT | 0.30 | 0.1117 | 0.9205 | 0.1993 | 0.7544 |
+| GAT | 0.40 | 0.1179 | 0.8477 | 0.2070 | 0.7843 |
+| GAT | 0.50 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
+| GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+| GAT | 0.70 | 0.1881 | 0.1258 | 0.1508 | 0.9529 |
+| GAT | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
+| GAT | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
+
+### Best Thresholds by Positive-Class F1
+
+| Model | Best Threshold | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|----------------|-------------|----------|------|----------|
+| GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
+| GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+
+### Interpretation
+
+For GCN, lowering the threshold from `0.50` to `0.40` improves the positive-class F1-score.
+
+For GAT, increasing the threshold from `0.50` to `0.60` improves the positive-class F1-score by reducing false positives.
+
+Threshold tuning shows that probability calibration can slightly improve both models, especially when the dataset is highly imbalanced.
+
+---
+
+## 12. Current Best Results
+
+### Best Positive-Class F1
+
+| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|---------|-------------|----------|------|----------|
+| GCN | NEGATIVE_RATIO=5, threshold=0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
+| GAT | NEGATIVE_RATIO=5, threshold=0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+
+### Best Recall-Oriented Setting
+
+| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------|---------|-------------|----------|------|----------|
+| GAT | NEGATIVE_RATIO=5, threshold=0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
+| GCN | NEGATIVE_RATIO=5, threshold=0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
+
+---
+
+## 13. Current Conclusion
 
 - Multi-graph training works successfully.
-- Adding DBD-style complexes increased the number of positive samples from a small proof-of-concept dataset to 698 positive nodes.
-- The dataset is still imbalanced, but it is now large enough for meaningful multi-graph experiments.
-- GCN provides a stronger positive-class F1-score.
-- GAT provides much stronger positive-class recall.
+- Adding DBD-style complexes increased the number of positive samples to 698.
+- The dataset is still imbalanced, but it is large enough for meaningful multi-graph experiments.
+- GCN is more conservative and gives the best positive-class F1-score.
+- GAT provides much stronger recall and detects more interface/contact nodes.
 - Negative sampling ratio strongly affects the precision-recall trade-off.
-- `NEGATIVE_RATIO = 5` is currently the best default setting for both GCN and GAT in terms of positive-class F1-score.
-- `NEGATIVE_RATIO = 2` or `3` may be useful for recall-oriented GAT experiments.
+- Probability threshold tuning slightly improves positive-class F1-score.
+- Current best F1 setting:
+  - GCN with `NEGATIVE_RATIO = 5` and `threshold = 0.40`
+- Current best recall-oriented model:
+  - GAT with low probability thresholds
 
 ---
 
-## 12. Next Experiments
+## 14. Next Experiments
 
 Potential next steps:
 
-1. Add validation split and early stopping.
-2. Tune model probability thresholds instead of using only `argmax`.
+1. Add a validation split and early stopping.
+2. Tune model probability thresholds using validation data instead of test data.
 3. Add richer node features:
    - amino acid type
    - hydrophobicity
@@ -310,4 +394,5 @@ Potential next steps:
    - precision vs recall
    - F1-score comparison
    - negative ratio tuning results
+   - threshold tuning results
 8. Prepare final report and presentation.

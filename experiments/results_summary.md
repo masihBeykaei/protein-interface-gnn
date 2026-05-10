@@ -1,10 +1,10 @@
 # Experimental Results Summary
 
-This document summarizes the current experimental results for protein–protein interface prediction using correspondence graphs and Graph Neural Networks.
+This document summarizes the current experimental results for protein–protein interface prediction using residue-level correspondence graphs and Graph Neural Networks.
 
 ---
 
-## Dataset Summary
+## 1. Dataset Summary
 
 The current multi-protein dataset was generated from residue-level correspondence graphs.
 
@@ -19,7 +19,7 @@ A residue pair is labeled as positive if at least one atom pair between the two 
 
 ---
 
-## Processed Protein Complexes
+## 2. Processed Protein Complexes
 
 | Case | Nodes | Positive | Negative | Positive Ratio | Edges |
 |------|-------|----------|----------|----------------|-------|
@@ -46,7 +46,29 @@ The dataset remains highly imbalanced, which is expected in protein–protein in
 
 ---
 
-## Train/Test Split
+## 3. Node Features
+
+Each correspondence node represents a residue pair:
+
+```text
+(residue_i, residue_j)
+```
+
+Current feature vector:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2]
+```
+
+Features:
+
+- Cα distance between the two residues
+- Degree of residue `i` in partner 1 graph
+- Degree of residue `j` in partner 2 graph
+
+---
+
+## 4. Train/Test Split
 
 The dataset was split by graph, not by node.  
 This means the model is evaluated on protein complexes that were not seen during training.
@@ -71,7 +93,7 @@ This means the model is evaluated on protein complexes that were not seen during
 
 ---
 
-## Training Strategy
+## 5. Training Strategy
 
 Because the dataset is highly imbalanced, a balanced loss mask was used.
 
@@ -81,26 +103,28 @@ For each training batch:
 - a random subset of negative nodes is sampled
 - the full graph is still used for message passing
 
-Current negative sampling ratio:
+The loss is computed using:
 
 ```text
-NEGATIVE_RATIO = 5
+all positive nodes + NEGATIVE_RATIO × positive_count negative nodes
 ```
 
-This means the loss is computed using:
-
-```text
-all positive nodes + 5 × positive_count negative nodes
-```
+This allows the model to learn from positive interface/contact nodes without removing graph structure.
 
 ---
 
-## Multi-Graph GCN Results
+## 6. Multi-Graph GCN Results
 
 Script:
 
 ```text
 training/train_multi_graph_gcn.py
+```
+
+Configuration:
+
+```text
+NEGATIVE_RATIO = 5
 ```
 
 ### Train Results
@@ -131,12 +155,18 @@ Accuracy:
 
 ---
 
-## Multi-Graph GAT Results
+## 7. Multi-Graph GAT Results
 
 Script:
 
 ```text
 training/train_multi_graph_gat.py
+```
+
+Configuration:
+
+```text
+NEGATIVE_RATIO = 5
 ```
 
 ### Train Results
@@ -167,18 +197,16 @@ Accuracy:
 
 ---
 
-## Model Comparison on Test Set
+## 8. Model Comparison on Test Set
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
 |-------|-------------|----------|------------|----------|
 | Multi-Graph GCN | 0.2068 | 0.3245 | 0.2526 | 0.9362 |
 | Multi-Graph GAT | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 
----
+### Interpretation
 
-## Interpretation
-
-The GCN model is more conservative. It predicts fewer positive nodes, which leads to higher precision and slightly better F1-score for the positive class.
+The GCN model is more conservative. It predicts fewer positive nodes, which leads to higher precision and a slightly better positive-class F1-score.
 
 The GAT model is more sensitive to interface/contact nodes. It achieves much higher recall for the positive class, meaning it detects more true interface residue pairs. However, this comes at the cost of more false positives and lower precision.
 
@@ -186,28 +214,100 @@ For protein–protein interface prediction, high recall can be valuable because 
 
 ---
 
-## Current Conclusion
+## 9. Negative Ratio Tuning Experiment
 
-- Multi-graph training works successfully.
-- The dataset is still imbalanced but now contains enough positive examples for meaningful training.
-- GCN provides a stronger positive-class F1-score.
-- GAT provides much stronger positive-class recall.
-- The next step is to improve precision while maintaining GAT's high recall.
+Script:
+
+```text
+experiments/tune_negative_ratio.py
+```
+
+This experiment compares GCN and GAT under different negative sampling ratios.
+
+Test set results:
+
+| Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|----------------|------------------|---------------|-----------|---------------|
+| GCN | 2 | 0.1442 | 0.6225 | 0.2341 | 0.8648 |
+| GCN | 3 | 0.1643 | 0.5298 | 0.2508 | 0.8949 |
+| GCN | 5 | 0.2059 | 0.3245 | 0.2519 | 0.9360 |
+| GCN | 10 | 0.2653 | 0.0861 | 0.1300 | 0.9617 |
+| GAT | 2 | 0.1107 | 0.9007 | 0.1972 | 0.7566 |
+| GAT | 3 | 0.1165 | 0.8874 | 0.2060 | 0.7729 |
+| GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
+| GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
 ---
 
-## Next Experiments
+## 10. Negative Ratio Tuning Interpretation
+
+### GCN
+
+The best positive-class F1-score for GCN was achieved with:
+
+```text
+NEGATIVE_RATIO = 5
+```
+
+However, `NEGATIVE_RATIO = 3` produced almost the same F1-score while achieving a much higher recall.
+
+| Ratio | Precision 1 | Recall 1 | F1 1 |
+|-------|-------------|----------|------|
+| 3 | 0.1643 | 0.5298 | 0.2508 |
+| 5 | 0.2059 | 0.3245 | 0.2519 |
+
+This shows a clear precision-recall trade-off.
+
+### GAT
+
+The best positive-class F1-score for GAT was achieved with:
+
+```text
+NEGATIVE_RATIO = 5
+```
+
+However, GAT with ratios `2` and `3` achieved very high recall:
+
+| Ratio | Precision 1 | Recall 1 | F1 1 |
+|-------|-------------|----------|------|
+| 2 | 0.1107 | 0.9007 | 0.1972 |
+| 3 | 0.1165 | 0.8874 | 0.2060 |
+| 5 | 0.1274 | 0.7483 | 0.2177 |
+
+GAT is more recall-oriented than GCN, especially when fewer negative samples are included in the loss.
+
+---
+
+## 11. Current Conclusion
+
+- Multi-graph training works successfully.
+- Adding DBD-style complexes increased the number of positive samples from a small proof-of-concept dataset to 698 positive nodes.
+- The dataset is still imbalanced, but it is now large enough for meaningful multi-graph experiments.
+- GCN provides a stronger positive-class F1-score.
+- GAT provides much stronger positive-class recall.
+- Negative sampling ratio strongly affects the precision-recall trade-off.
+- `NEGATIVE_RATIO = 5` is currently the best default setting for both GCN and GAT in terms of positive-class F1-score.
+- `NEGATIVE_RATIO = 2` or `3` may be useful for recall-oriented GAT experiments.
+
+---
+
+## 12. Next Experiments
 
 Potential next steps:
 
-1. Tune the negative sampling ratio.
-2. Add richer node features:
+1. Add validation split and early stopping.
+2. Tune model probability thresholds instead of using only `argmax`.
+3. Add richer node features:
    - amino acid type
    - hydrophobicity
    - charge
    - accessible surface area
-3. Add validation split and early stopping.
-4. Try threshold tuning on model probabilities.
-5. Visualize GAT attention weights.
-6. Compare different GAT head counts and hidden dimensions.
-7. Add result plots for final reporting.
+4. Visualize GAT attention weights.
+5. Compare different GAT head counts and hidden dimensions.
+6. Analyze false positives and false negatives.
+7. Add plots for:
+   - class imbalance
+   - precision vs recall
+   - F1-score comparison
+   - negative ratio tuning results
+8. Prepare final report and presentation.

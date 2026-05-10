@@ -23,6 +23,7 @@ Implemented so far:
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
 - Multi-graph GCN and GAT training with balanced loss masking
+- Negative sampling ratio tuning experiments
 
 ---
 
@@ -208,16 +209,56 @@ To address this issue, multi-graph training uses a balanced loss mask:
 - A random subset of negative nodes is sampled.
 - The full graph is still used for message passing.
 
-Current setting:
+The loss is computed using:
 
 ```text
-NEGATIVE_RATIO = 5
+all positive nodes + NEGATIVE_RATIO × positive_count negative nodes
 ```
 
-This means the loss is computed using:
+---
+
+## 🧪 Negative Ratio Tuning
+
+Different negative sampling ratios were tested for both GCN and GAT.
+
+Script:
 
 ```text
-all positive nodes + 5 × positive_count negative nodes
+experiments/tune_negative_ratio.py
+```
+
+Results:
+
+| Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|----------------|------------------|---------------|-----------|---------------|
+| GCN | 2 | 0.1442 | 0.6225 | 0.2341 | 0.8648 |
+| GCN | 3 | 0.1643 | 0.5298 | 0.2508 | 0.8949 |
+| GCN | 5 | 0.2059 | 0.3245 | 0.2519 | 0.9360 |
+| GCN | 10 | 0.2653 | 0.0861 | 0.1300 | 0.9617 |
+| GAT | 2 | 0.1107 | 0.9007 | 0.1972 | 0.7566 |
+| GAT | 3 | 0.1165 | 0.8874 | 0.2060 | 0.7729 |
+| GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
+| GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
+
+### Current Best Settings
+
+| Model | Best Ratio by F1 | Precision 1 | Recall 1 | F1 1 |
+|-------|------------------|-------------|----------|------|
+| GCN | 5 | 0.2059 | 0.3245 | 0.2519 |
+| GAT | 5 | 0.1274 | 0.7483 | 0.2177 |
+
+### Interpretation
+
+- GCN with `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.
+- GCN with `NEGATIVE_RATIO = 3` gives a better recall while keeping almost the same F1-score.
+- GAT with `NEGATIVE_RATIO = 5` gives the best positive-class F1-score among GAT settings.
+- GAT with `NEGATIVE_RATIO = 2` or `3` gives very high recall and may be useful for recall-oriented interface discovery.
+
+Tuning results are saved in:
+
+```text
+experiments/negative_ratio_tuning_results.md
+experiments/negative_ratio_tuning_results.csv
 ```
 
 ---
@@ -282,6 +323,12 @@ python training/train_multi_graph_gcn.py
 python training/train_multi_graph_gat.py
 ```
 
+### 6. Run negative ratio tuning
+
+```bash
+python experiments/tune_negative_ratio.py
+```
+
 ---
 
 ## 📂 Project Structure
@@ -312,7 +359,10 @@ protein-interface-gnn/
 │   └── train_multi_graph_gat.py
 │
 ├── experiments/
-│   └── results_summary.md
+│   ├── results_summary.md
+│   ├── tune_negative_ratio.py
+│   ├── negative_ratio_tuning_results.md
+│   └── negative_ratio_tuning_results.csv
 │
 ├── utils/
 │
@@ -328,27 +378,31 @@ protein-interface-gnn/
 Current results show different behaviors between GCN and GAT:
 
 - GCN is more conservative.
-- GCN achieves better positive-class F1-score on the current test split.
+- GCN achieves the best positive-class F1-score on the current test split.
 - GAT detects more true positive interface nodes.
 - GAT achieves much higher recall but produces more false positives.
-- This trade-off is important in biological interface prediction, where missing true interface residues may be costly.
+- Negative sampling ratio strongly affects the precision-recall trade-off.
+- For biological interface discovery, high recall can be useful because missing true interface residues may be more harmful than producing extra candidates.
 
 ---
 
 ## 🔜 Next Steps
 
-- Tune the negative sampling ratio.
 - Add validation split and early stopping.
+- Tune model probability thresholds instead of using only `argmax`.
 - Improve node features using:
   - amino acid type
   - hydrophobicity
   - charge
   - accessible surface area
 - Tune GAT hidden dimensions and attention heads.
-- Add probability threshold tuning.
 - Visualize GAT attention weights.
 - Analyze false positives and false negatives.
-- Add plots for precision, recall, F1-score, and class imbalance.
+- Add plots for:
+  - class imbalance
+  - precision vs recall
+  - F1-score comparison
+  - negative ratio tuning results
 - Prepare final project report and presentation.
 
 ---

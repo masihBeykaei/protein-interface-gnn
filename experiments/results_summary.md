@@ -90,11 +90,11 @@ However, after adding DBD-style complexes, the number of positive samples increa
 
 ---
 
-## 5. Train/Test Split
+## 5. Original Graph-Level Train/Test Split
 
-The dataset was split by graph, not by node.
+The initial multi-graph experiments used a graph-level train/test split.
 
-This means the model is evaluated on protein complexes that were not seen during training.
+This means the model was evaluated on protein complexes that were not seen during training.
 
 ### Train Graphs
 
@@ -136,7 +136,7 @@ all positive nodes + NEGATIVE_RATIO × positive_count negative nodes
 
 ---
 
-## 7. Multi-Graph GCN Results
+## 7. Initial Multi-Graph GCN Results
 
 Script:
 
@@ -179,7 +179,7 @@ Accuracy:
 
 ---
 
-## 8. Multi-Graph GAT Results
+## 8. Initial Multi-Graph GAT Results
 
 Script:
 
@@ -222,7 +222,7 @@ Accuracy:
 
 ---
 
-## 9. Model Comparison on Test Set
+## 9. Initial Model Comparison on Test Set
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
 |-------|-------------|----------|------------|----------|
@@ -234,8 +234,6 @@ Accuracy:
 The GCN model is more conservative. It predicts fewer positive nodes, which leads to higher precision and a slightly better positive-class F1-score.
 
 The GAT model is more sensitive to interface/contact nodes. It achieves much higher recall for the positive class, meaning it detects more true interface residue pairs. However, this comes at the cost of more false positives and lower precision.
-
-For protein–protein interface prediction, high recall can be useful because missing true interface residues may be more problematic than producing additional candidate residues for further biological analysis.
 
 ---
 
@@ -310,7 +308,7 @@ P(class 1) >= threshold
 | GCN | 0.60 | 0.2400 | 0.1589 | 0.1912 | 0.9554 |
 | GCN | 0.70 | 0.2250 | 0.0596 | 0.0942 | 0.9620 |
 | GCN | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-| GCN | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
+| GCN | 0.90 | 0.0000 | 0.0000 | 0.9668 |
 | GAT | 0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
 | GAT | 0.10 | 0.0828 | 0.9603 | 0.1525 | 0.6456 |
 | GAT | 0.15 | 0.0927 | 0.9470 | 0.1688 | 0.6904 |
@@ -341,58 +339,113 @@ Threshold tuning shows that probability calibration can slightly improve both mo
 
 ---
 
-## 12. Current Best Results
+## 12. Train/Validation/Test Early Stopping Experiment
 
-### Best Positive-Class F1
+Script:
 
-| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------|---------|-------------|----------|------|----------|
-| GCN | NEGATIVE_RATIO=5, threshold=0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
-| GAT | NEGATIVE_RATIO=5, threshold=0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+```text
+experiments/train_val_test_early_stopping.py
+```
 
-### Best Recall-Oriented Setting
+This experiment uses a graph-level train/validation/test split.
 
-| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------|---------|-------------|----------|------|----------|
-| GAT | NEGATIVE_RATIO=5, threshold=0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
-| GCN | NEGATIVE_RATIO=5, threshold=0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
+The validation set is used for:
+
+- early stopping
+- selecting the probability threshold for class 1
+
+The test set is used only for final evaluation.
+
+### Split
+
+#### Train Graphs
+
+- 1WEJ_HL_F
+- 1JPS_HL_T
+- 1AHW_AB_C
+- 2FD6_HL_U
+- 2VIS_AB_C
+- 1MLC_AB_E
+- 3MJ9_HL_A
+
+#### Validation Graphs
+
+- 1DQJ_AB_C
+- 1E6J_HL_P
+
+#### Test Graphs
+
+- 1BRS_A_B
+- 1FSS_A_B
+- 3HMX_LH_AB
+
+### Results
+
+| Model | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
+| GCN | 7 | 0.50 | 0.3434 | 0.2787 | 0.3077 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 56 | 0.50 | 0.1589 | 0.6721 | 0.2571 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Interpretation
+
+This is the most scientifically reliable experiment so far because the test set is not used for threshold selection or early stopping.
+
+Under this setup:
+
+- GAT achieves higher positive-class F1-score on the test set.
+- GAT achieves substantially higher recall than GCN.
+- GCN remains more conservative, with higher accuracy but lower recall.
+- GAT is more suitable for interface discovery when finding more true interface pairs is important.
 
 ---
 
-## 13. Current Conclusion
+## 13. Current Best Scientifically Reliable Result
+
+The most reliable setting is the train/validation/test split with validation-based early stopping.
+
+| Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|------------|-----------|------------------|---------------|-----------|---------------|
+| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+Current best model under the strict train/validation/test protocol:
+
+```text
+GAT
+```
+
+---
+
+## 14. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
 - The dataset is still imbalanced, but it is large enough for meaningful multi-graph experiments.
-- GCN is more conservative and gives the best positive-class F1-score.
-- GAT provides much stronger recall and detects more interface/contact nodes.
-- Negative sampling ratio strongly affects the precision-recall trade-off.
-- Probability threshold tuning slightly improves positive-class F1-score.
-- Current best F1 setting:
-  - GCN with `NEGATIVE_RATIO = 5` and `threshold = 0.40`
-- Current best recall-oriented model:
-  - GAT with low probability thresholds
+- GCN is conservative and often achieves higher accuracy.
+- GAT detects more positive interface/contact nodes.
+- In the most reliable train/validation/test setup, GAT outperforms GCN on positive-class F1-score.
+- Validation-based early stopping makes the evaluation more scientifically defensible.
+- Probability threshold tuning on test data showed useful behavior, but validation-based threshold selection is the preferred protocol.
 
 ---
 
-## 14. Next Experiments
+## 15. Next Experiments
 
 Potential next steps:
 
-1. Add a validation split and early stopping.
-2. Tune model probability thresholds using validation data instead of test data.
-3. Add richer node features:
+1. Add richer node features:
    - amino acid type
    - hydrophobicity
    - charge
    - accessible surface area
-4. Visualize GAT attention weights.
-5. Compare different GAT head counts and hidden dimensions.
-6. Analyze false positives and false negatives.
-7. Add plots for:
+2. Visualize GAT attention weights.
+3. Compare different GAT head counts and hidden dimensions.
+4. Analyze false positives and false negatives.
+5. Add plots for:
    - class imbalance
    - precision vs recall
    - F1-score comparison
    - negative ratio tuning results
    - threshold tuning results
-8. Prepare final report and presentation.
+   - early stopping results
+6. Prepare final report and presentation.

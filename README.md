@@ -25,6 +25,7 @@ Implemented so far:
 - Multi-graph GCN and GAT training with balanced loss masking
 - Negative sampling ratio tuning
 - Probability threshold tuning
+- Train/validation/test split with validation-based early stopping
 
 ---
 
@@ -176,7 +177,7 @@ Current setup:
 
 ---
 
-## 📈 Multi-Graph Experimental Results
+## 📈 Initial Multi-Graph Experimental Results
 
 Multi-graph training was performed using 12 processed protein complex graphs.
 
@@ -199,10 +200,56 @@ threshold = 0.50
 The GCN model is more conservative and achieves a higher positive-class F1-score.  
 The GAT model is more sensitive and achieves substantially higher recall for positive interface nodes.
 
+---
+
+## ✅ Validation-Based Early Stopping Results
+
+A stricter experiment was added using a graph-level train/validation/test split.
+
+The validation set is used for:
+
+- early stopping
+- selecting the probability threshold for class 1
+
+The test set is used only for final evaluation.
+
+Script:
+
+```text
+experiments/train_val_test_early_stopping.py
+```
+
+### Split
+
+```text
+Train:      1WEJ, 1JPS, 1AHW, 2FD6, 2VIS, 1MLC, 3MJ9
+Validation: 1DQJ, 1E6J
+Test:       1BRS, 1FSS, 3HMX
+```
+
+### Results
+
+| Model | Best Epoch | Best Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|------------|----------------|------------------|---------------|-----------|---------------|
+| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Interpretation
+
+This is the most scientifically reliable experiment so far because the test set is not used for early stopping or threshold selection.
+
+Under this stricter setup:
+
+- GAT achieves better positive-class F1-score than GCN.
+- GAT achieves higher recall than GCN.
+- GCN remains more conservative and has higher accuracy.
+- GAT is more suitable for interface discovery when finding more true interface pairs is important.
+
 Full experimental details are available in:
 
 ```text
 experiments/results_summary.md
+experiments/early_stopping_results.md
 ```
 
 ---
@@ -294,23 +341,24 @@ experiments/threshold_tuning_results.md
 experiments/threshold_tuning_results.csv
 ```
 
+> Note: This threshold tuning was performed as an exploratory experiment. The stricter validation-based experiment should be considered the more scientifically reliable result.
+
 ---
 
-## 🏆 Current Best Results
+## 🏆 Current Best Scientifically Reliable Result
 
-### Best Positive-Class F1
+The most reliable result currently comes from the train/validation/test experiment with validation-based early stopping.
 
-| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------|---------|-------------|----------|------|----------|
-| GCN | NEGATIVE_RATIO=5, threshold=0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
-| GAT | NEGATIVE_RATIO=5, threshold=0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
+| Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|------------|-----------|------------------|---------------|-----------|---------------|
+| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 
-### Best Recall-Oriented Result
+Current best model under the strict protocol:
 
-| Model | Setting | Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------|---------|-------------|----------|------|----------|
-| GAT | NEGATIVE_RATIO=5, threshold=0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
-| GCN | NEGATIVE_RATIO=5, threshold=0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
+```text
+GAT
+```
 
 ---
 
@@ -386,6 +434,12 @@ python experiments/tune_negative_ratio.py
 python experiments/tune_probability_threshold.py
 ```
 
+### 8. Run train/validation/test early stopping experiment
+
+```bash
+python experiments/train_val_test_early_stopping.py
+```
+
 ---
 
 ## 📂 Project Structure
@@ -422,7 +476,10 @@ protein-interface-gnn/
 │   ├── negative_ratio_tuning_results.csv
 │   ├── tune_probability_threshold.py
 │   ├── threshold_tuning_results.md
-│   └── threshold_tuning_results.csv
+│   ├── threshold_tuning_results.csv
+│   ├── train_val_test_early_stopping.py
+│   ├── early_stopping_results.md
+│   └── early_stopping_results.csv
 │
 ├── utils/
 │
@@ -438,26 +495,23 @@ protein-interface-gnn/
 Current results show different behaviors between GCN and GAT:
 
 - GCN is more conservative.
-- GCN currently achieves the best positive-class F1-score.
-- GAT detects more true positive interface nodes.
-- GAT achieves much higher recall but produces more false positives.
-- Negative sampling ratio strongly affects the precision-recall trade-off.
-- Probability threshold tuning slightly improves positive-class F1-score.
+- GCN often has higher accuracy because it predicts fewer positives.
+- GAT detects more true positive interface/contact nodes.
+- In the stricter train/validation/test setup, GAT achieves better positive-class F1-score than GCN.
+- Validation-based early stopping makes the evaluation more defensible.
 - For biological interface discovery, high recall can be useful because missing true interface residues may be more harmful than producing extra candidates.
 
 ---
 
 ## 🔜 Next Steps
 
-- Add validation split and early stopping.
-- Tune thresholds using validation data instead of test data.
-- Improve node features using:
+- Add richer node features:
   - amino acid type
   - hydrophobicity
   - charge
   - accessible surface area
-- Tune GAT hidden dimensions and attention heads.
 - Visualize GAT attention weights.
+- Tune GAT hidden dimensions and attention heads.
 - Analyze false positives and false negatives.
 - Add plots for:
   - class imbalance
@@ -465,6 +519,7 @@ Current results show different behaviors between GCN and GAT:
   - F1-score comparison
   - negative ratio tuning results
   - threshold tuning results
+  - early stopping results
 - Prepare final report and presentation.
 
 ---

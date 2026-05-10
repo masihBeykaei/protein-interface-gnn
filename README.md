@@ -22,6 +22,7 @@ Implemented so far:
 - Single-graph GCN and GAT experiments on 1BRS
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
+- Multi-graph GCN and GAT training with balanced loss masking
 
 ---
 
@@ -39,7 +40,11 @@ For each protein complex:
 
 ### Node Features
 
-Each correspondence node represents a residue pair `(residue_i, residue_j)`.
+Each correspondence node represents a residue pair:
+
+```text
+(residue_i, residue_j)
+```
 
 Current node features:
 
@@ -57,13 +62,13 @@ Feature vector:
 
 ## 📦 Processed Dataset
 
-The processed dataset is generated from PDB files stored in:
+Raw PDB files are stored in:
 
 ```text
 data/raw_pdb/
 ```
 
-The generated NumPy files are stored in:
+Processed NumPy files are generated in:
 
 ```text
 data/processed/
@@ -91,30 +96,31 @@ Example:
 
 ## 🧪 Current Multi-Protein Dataset Summary
 
-The dataset currently includes original examples plus several DBD-style protein complexes.
+The current dataset includes original examples plus several DBD-style protein complexes.
 
 | Case | Nodes | Positive | Negative | Positive Ratio |
 |------|-------|----------|----------|----------------|
 | 1BRS_A_B | 225 | 16 | 209 | 0.0711 |
-| 1FSS_A_B | 2013 | 63 | 1950 | 0.0313 |
-| 1AHW_AB_C | 2142 | 73 | 2069 | 0.0341 |
-| 1DQJ_AB_C | 1978 | 71 | 1907 | 0.0359 |
-| 1E6J_HL_P | 1131 | 51 | 1080 | 0.0451 |
-| 1JPS_HL_T | 2184 | 71 | 2113 | 0.0325 |
-| 1MLC_AB_E | 1540 | 54 | 1486 | 0.0351 |
-| 1WEJ_HL_F | 1026 | 41 | 985 | 0.0400 |
-| 2FD6_HL_U | 1147 | 47 | 1100 | 0.0410 |
-| 2VIS_AB_C | 1728 | 51 | 1677 | 0.0295 |
-| 3HMX_LH_AB | 2310 | 72 | 2238 | 0.0312 |
-| 3MJ9_HL_A | 3283 | 88 | 3195 | 0.0268 |
+| 1FSS_A_B | 2,013 | 63 | 1,950 | 0.0313 |
+| 1AHW_AB_C | 2,142 | 73 | 2,069 | 0.0341 |
+| 1DQJ_AB_C | 1,978 | 71 | 1,907 | 0.0359 |
+| 1E6J_HL_P | 1,131 | 51 | 1,080 | 0.0451 |
+| 1JPS_HL_T | 2,184 | 71 | 2,113 | 0.0325 |
+| 1MLC_AB_E | 1,540 | 54 | 1,486 | 0.0351 |
+| 1WEJ_HL_F | 1,026 | 41 | 985 | 0.0400 |
+| 2FD6_HL_U | 1,147 | 47 | 1,100 | 0.0410 |
+| 2VIS_AB_C | 1,728 | 51 | 1,677 | 0.0295 |
+| 3HMX_LH_AB | 2,310 | 72 | 2,238 | 0.0312 |
+| 3MJ9_HL_A | 3,283 | 88 | 3,195 | 0.0268 |
 
-### Total
+### Total Dataset
 
 | Total Nodes | Total Positive | Total Negative | Positive Ratio |
 |------------|----------------|----------------|----------------|
-| 20707 | 698 | 20009 | 0.0337 |
+| 20,707 | 698 | 20,009 | 0.0337 |
 
-The dataset is still imbalanced, which is expected in protein–protein interface prediction. However, the number of positive samples increased significantly after adding DBD-style complexes.
+The dataset is highly imbalanced, which is expected in protein–protein interface prediction.  
+After adding DBD-style complexes, the number of positive samples increased significantly.
 
 ---
 
@@ -126,21 +132,24 @@ Implemented in:
 
 ```text
 training/train_single_graph.py
+training/train_multi_graph_gcn.py
 ```
 
 Current setup:
 
 - 2-layer GCN
 - CrossEntropy loss
-- Class weighting for imbalance
+- Balanced loss mask for multi-graph training
 - Precision, Recall, and F1-score evaluation
 
-### GAT Tuned
+### GAT
 
 Implemented in:
 
 ```text
+training/train_single_graph_gat.py
 training/train_single_graph_gat_tuned.py
+training/train_multi_graph_gat.py
 ```
 
 Current setup:
@@ -149,7 +158,7 @@ Current setup:
 - 16 hidden units
 - 4 attention heads
 - Dropout = 0.2
-- Class weighting `[1.0, 10.0]`
+- Balanced loss mask for multi-graph training
 - Designed to improve recall on positive interface nodes
 
 ---
@@ -162,6 +171,54 @@ Current setup:
 | GAT tuned | 1.0000 | 0.2153 | 0.3543 | 0.0889 | 1.0000 | 0.1633 | 0.2711 |
 
 > Accuracy is misleading due to strong class imbalance. Recall and F1-score for the positive class are more informative.
+
+---
+
+## 📈 Multi-Graph Experimental Results
+
+Multi-graph training was performed using 12 processed protein complex graphs.
+
+The dataset was split by graph, meaning the model was evaluated on protein complexes that were not used during training.
+
+### Test Set Comparison
+
+| Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
+|-------|-------------|----------|------------|----------|
+| Multi-Graph GCN | 0.2068 | 0.3245 | 0.2526 | 0.9362 |
+| Multi-Graph GAT | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
+
+The GCN model is more conservative and achieves a higher positive-class F1-score.  
+The GAT model is more sensitive and achieves substantially higher recall for positive interface nodes.
+
+Full experimental details are available in:
+
+```text
+experiments/results_summary.md
+```
+
+---
+
+## ⚖️ Handling Class Imbalance
+
+Protein–protein interface prediction is naturally imbalanced because only a small fraction of residue pairs are true interface/contact pairs.
+
+To address this issue, multi-graph training uses a balanced loss mask:
+
+- All positive nodes are included in the loss.
+- A random subset of negative nodes is sampled.
+- The full graph is still used for message passing.
+
+Current setting:
+
+```text
+NEGATIVE_RATIO = 5
+```
+
+This means the loss is computed using:
+
+```text
+all positive nodes + 5 × positive_count negative nodes
+```
 
 ---
 
@@ -207,10 +264,22 @@ This generates correspondence graph labels, node features, residue pairs, and ed
 python training/train_single_graph.py
 ```
 
-### 3. Train tuned GAT on single graph
+### 3. Train tuned single-graph GAT
 
 ```bash
 python training/train_single_graph_gat_tuned.py
+```
+
+### 4. Train multi-graph GCN
+
+```bash
+python training/train_multi_graph_gcn.py
+```
+
+### 5. Train multi-graph GAT
+
+```bash
+python training/train_multi_graph_gat.py
 ```
 
 ---
@@ -238,11 +307,14 @@ protein-interface-gnn/
 ├── training/
 │   ├── train_single_graph.py
 │   ├── train_single_graph_gat.py
-│   └── train_single_graph_gat_tuned.py
-│
-├── utils/
+│   ├── train_single_graph_gat_tuned.py
+│   ├── train_multi_graph_gcn.py
+│   └── train_multi_graph_gat.py
 │
 ├── experiments/
+│   └── results_summary.md
+│
+├── utils/
 │
 ├── requirements.txt
 ├── README.md
@@ -251,22 +323,38 @@ protein-interface-gnn/
 
 ---
 
+## 🔬 Current Interpretation
+
+Current results show different behaviors between GCN and GAT:
+
+- GCN is more conservative.
+- GCN achieves better positive-class F1-score on the current test split.
+- GAT detects more true positive interface nodes.
+- GAT achieves much higher recall but produces more false positives.
+- This trade-off is important in biological interface prediction, where missing true interface residues may be costly.
+
+---
+
 ## 🔜 Next Steps
 
-- Implement multi-graph GCN training using all processed complexes
-- Implement multi-graph GAT training
-- Use balanced loss masks or class weighting to handle imbalance
-- Compare GCN vs GAT on the full multi-protein dataset
-- Add plots for precision, recall, F1-score, and class imbalance
-- Analyze false positives and false negatives
-- Optionally visualize GAT attention weights
-- Improve node features using amino acid type, hydrophobicity, charge, and ASA
-- Prepare final project report and presentation
+- Tune the negative sampling ratio.
+- Add validation split and early stopping.
+- Improve node features using:
+  - amino acid type
+  - hydrophobicity
+  - charge
+  - accessible surface area
+- Tune GAT hidden dimensions and attention heads.
+- Add probability threshold tuning.
+- Visualize GAT attention weights.
+- Analyze false positives and false negatives.
+- Add plots for precision, recall, F1-score, and class imbalance.
+- Prepare final project report and presentation.
 
 ---
 
 ## 📌 Notes
 
 - Raw PDB files and processed `.npy` files should not be committed to GitHub.
-- The repository contains the reproducible pipeline and training scripts.
+- The repository contains the reproducible preprocessing and training pipeline.
 - The processed dataset can be regenerated by running the preprocessing scripts.

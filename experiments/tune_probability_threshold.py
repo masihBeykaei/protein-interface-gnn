@@ -23,7 +23,10 @@ LR_GCN = 0.01
 LR_GAT = 0.005
 WEIGHT_DECAY = 5e-4
 
-THRESHOLDS = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+THRESHOLDS = [
+    0.05, 0.10, 0.15, 0.20, 0.25, 0.30,
+    0.40, 0.50, 0.60, 0.70, 0.80, 0.90
+]
 
 PROCESSED_DIR = os.path.join("data", "processed")
 RESULTS_CSV = os.path.join("experiments", "threshold_tuning_results.csv")
@@ -102,21 +105,24 @@ def load_dataset():
     if len(dataset) < 2:
         raise RuntimeError("Not enough graphs loaded.")
 
-    # Normalize node features globally
-    all_x = torch.cat([data.x for data in dataset], dim=0)
-    mean = all_x.mean(dim=0)
-    std = all_x.std(dim=0)
-    std[std == 0] = 1.0
-
-    for data in dataset:
-        data.x = (data.x - mean) / std
-
-    # Fixed graph-level split
     random.shuffle(dataset)
 
     split_idx = int(0.8 * len(dataset))
     train_dataset = dataset[:split_idx]
     test_dataset = dataset[split_idx:]
+
+    # Normalize using train-set statistics only
+    all_train_x = torch.cat([data.x for data in train_dataset], dim=0)
+
+    mean = all_train_x.mean(dim=0)
+    std = all_train_x.std(dim=0)
+    std[std == 0] = 1.0
+
+    for data in train_dataset:
+        data.x = (data.x - mean) / std
+
+    for data in test_dataset:
+        data.x = (data.x - mean) / std
 
     return train_dataset, test_dataset
 
@@ -139,6 +145,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
     sampled_neg_idx = neg_idx[perm[:num_neg]]
 
     mask_idx = torch.cat([pos_idx, sampled_neg_idx])
+
     return mask_idx
 
 
@@ -146,8 +153,9 @@ def create_balanced_loss_mask(y, negative_ratio=5):
 # Models
 # -----------------------
 class MultiGraphGCN(torch.nn.Module):
-    def __init__(self, in_channels=3, hidden_channels=32, out_channels=2):
+    def __init__(self, in_channels, hidden_channels=32, out_channels=2):
         super().__init__()
+
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, out_channels)
 
@@ -155,13 +163,14 @@ class MultiGraphGCN(torch.nn.Module):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
+
         return x
 
 
 class MultiGraphGAT(torch.nn.Module):
     def __init__(
         self,
-        in_channels=3,
+        in_channels,
         hidden_channels=16,
         heads=4,
         out_channels=2,
@@ -188,10 +197,14 @@ class MultiGraphGAT(torch.nn.Module):
 
     def forward(self, x, edge_index):
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat1(x, edge_index)
         x = F.elu(x)
+
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat2(x, edge_index)
+
         return x
 
 
@@ -201,15 +214,18 @@ class MultiGraphGAT(torch.nn.Module):
 def train_model(model_name, train_loader, device):
     set_seed(SEED)
 
+    input_dim = train_loader.dataset[0].x.shape[1]
+    print(f"{model_name} input feature dimension: {input_dim}")
+
     if model_name == "GCN":
-        model = MultiGraphGCN().to(device)
+        model = MultiGraphGCN(in_channels=input_dim).to(device)
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=LR_GCN,
             weight_decay=WEIGHT_DECAY,
         )
     elif model_name == "GAT":
-        model = MultiGraphGAT().to(device)
+        model = MultiGraphGAT(in_channels=input_dim).to(device)
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=LR_GAT,
@@ -319,6 +335,8 @@ def main():
     print("\nTest graphs:")
     print([data.case_name for data in test_dataset])
 
+    print("\nFeature dimension:", train_dataset[0].x.shape[1])
+
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
@@ -384,6 +402,8 @@ def main():
     with open(RESULTS_MD, "w", encoding="utf-8") as f:
         f.write("# Probability Threshold Tuning Results\n\n")
         f.write("This experiment evaluates different probability thresholds for predicting the positive class.\n\n")
+        f.write(f"Input feature dimension: `{train_dataset[0].x.shape[1]}`\n\n")
+
         f.write("A node is predicted as positive if:\n\n")
         f.write("```text\n")
         f.write("P(class 1) >= threshold\n")

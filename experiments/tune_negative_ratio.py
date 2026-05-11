@@ -100,21 +100,24 @@ def load_dataset():
     if len(dataset) < 2:
         raise RuntimeError("Not enough graphs loaded.")
 
-    # Normalize features globally
-    all_x = torch.cat([data.x for data in dataset], dim=0)
-    mean = all_x.mean(dim=0)
-    std = all_x.std(dim=0)
-    std[std == 0] = 1.0
-
-    for data in dataset:
-        data.x = (data.x - mean) / std
-
-    # Fixed graph-level split
     random.shuffle(dataset)
 
     split_idx = int(0.8 * len(dataset))
     train_dataset = dataset[:split_idx]
     test_dataset = dataset[split_idx:]
+
+    # Normalize using train-set statistics only
+    all_train_x = torch.cat([data.x for data in train_dataset], dim=0)
+
+    mean = all_train_x.mean(dim=0)
+    std = all_train_x.std(dim=0)
+    std[std == 0] = 1.0
+
+    for data in train_dataset:
+        data.x = (data.x - mean) / std
+
+    for data in test_dataset:
+        data.x = (data.x - mean) / std
 
     return train_dataset, test_dataset
 
@@ -137,6 +140,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
     sampled_neg_idx = neg_idx[perm[:num_neg]]
 
     mask_idx = torch.cat([pos_idx, sampled_neg_idx])
+
     return mask_idx
 
 
@@ -144,8 +148,9 @@ def create_balanced_loss_mask(y, negative_ratio=5):
 # Models
 # -----------------------
 class MultiGraphGCN(torch.nn.Module):
-    def __init__(self, in_channels=3, hidden_channels=32, out_channels=2):
+    def __init__(self, in_channels, hidden_channels=32, out_channels=2):
         super().__init__()
+
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, out_channels)
 
@@ -153,13 +158,14 @@ class MultiGraphGCN(torch.nn.Module):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
+
         return x
 
 
 class MultiGraphGAT(torch.nn.Module):
     def __init__(
         self,
-        in_channels=3,
+        in_channels,
         hidden_channels=16,
         heads=4,
         out_channels=2,
@@ -186,10 +192,14 @@ class MultiGraphGAT(torch.nn.Module):
 
     def forward(self, x, edge_index):
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat1(x, edge_index)
         x = F.elu(x)
+
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat2(x, edge_index)
+
         return x
 
 
@@ -243,15 +253,18 @@ def evaluate(model, loader, device):
 def train_model(model_name, negative_ratio, train_loader, test_loader, device):
     set_seed(SEED)
 
+    input_dim = train_loader.dataset[0].x.shape[1]
+    print(f"{model_name} input feature dimension: {input_dim}")
+
     if model_name == "GCN":
-        model = MultiGraphGCN().to(device)
+        model = MultiGraphGCN(in_channels=input_dim).to(device)
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=LR_GCN,
             weight_decay=WEIGHT_DECAY,
         )
     elif model_name == "GAT":
-        model = MultiGraphGAT().to(device)
+        model = MultiGraphGAT(in_channels=input_dim).to(device)
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=LR_GAT,
@@ -311,6 +324,8 @@ def main():
 
     print("\nTest graphs:")
     print([data.case_name for data in test_dataset])
+
+    print("\nFeature dimension:", train_dataset[0].x.shape[1])
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -378,6 +393,7 @@ def main():
     with open(RESULTS_MD, "w", encoding="utf-8") as f:
         f.write("# Negative Ratio Tuning Results\n\n")
         f.write("This experiment compares GCN and GAT under different negative sampling ratios.\n\n")
+        f.write(f"Input feature dimension: `{train_dataset[0].x.shape[1]}`\n\n")
 
         f.write("| Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |\n")
         f.write("|-------|----------------|------------------|---------------|-----------|---------------|\n")

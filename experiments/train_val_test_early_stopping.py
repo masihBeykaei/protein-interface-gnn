@@ -25,7 +25,10 @@ LR_GCN = 0.01
 LR_GAT = 0.005
 WEIGHT_DECAY = 5e-4
 
-THRESHOLDS = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+THRESHOLDS = [
+    0.05, 0.10, 0.15, 0.20, 0.25, 0.30,
+    0.40, 0.50, 0.60, 0.70, 0.80, 0.90
+]
 
 PROCESSED_DIR = os.path.join("data", "processed")
 RESULTS_CSV = os.path.join("experiments", "early_stopping_results.csv")
@@ -141,6 +144,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
     sampled_neg_idx = neg_idx[perm[:num_neg]]
 
     mask_idx = torch.cat([pos_idx, sampled_neg_idx])
+
     return mask_idx
 
 
@@ -148,8 +152,9 @@ def create_balanced_loss_mask(y, negative_ratio=5):
 # Models
 # -----------------------
 class MultiGraphGCN(torch.nn.Module):
-    def __init__(self, in_channels=3, hidden_channels=32, out_channels=2):
+    def __init__(self, in_channels, hidden_channels=32, out_channels=2):
         super().__init__()
+
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, out_channels)
 
@@ -157,13 +162,14 @@ class MultiGraphGCN(torch.nn.Module):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
+
         return x
 
 
 class MultiGraphGAT(torch.nn.Module):
     def __init__(
         self,
-        in_channels=3,
+        in_channels,
         hidden_channels=16,
         heads=4,
         out_channels=2,
@@ -190,18 +196,24 @@ class MultiGraphGAT(torch.nn.Module):
 
     def forward(self, x, edge_index):
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat1(x, edge_index)
         x = F.elu(x)
+
         x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = self.gat2(x, edge_index)
+
         return x
 
 
-def build_model(model_name):
+def build_model(model_name, input_dim):
     if model_name == "GCN":
-        return MultiGraphGCN()
+        return MultiGraphGCN(in_channels=input_dim)
+
     if model_name == "GAT":
-        return MultiGraphGAT()
+        return MultiGraphGAT(in_channels=input_dim)
+
     raise ValueError(f"Unknown model: {model_name}")
 
 
@@ -287,10 +299,17 @@ def find_best_threshold(true, prob_1):
 # -----------------------
 # Training with early stopping
 # -----------------------
-def train_with_early_stopping(model_name, train_loader, val_loader, test_loader, device):
+def train_with_early_stopping(
+    model_name,
+    train_loader,
+    val_loader,
+    test_loader,
+    device,
+    input_dim,
+):
     set_seed(SEED)
 
-    model = build_model(model_name).to(device)
+    model = build_model(model_name, input_dim=input_dim).to(device)
     optimizer = build_optimizer(model_name, model)
 
     best_val_f1 = -1.0
@@ -350,6 +369,9 @@ def train_with_early_stopping(model_name, train_loader, val_loader, test_loader,
             print(f"{model_name} early stopping at epoch {epoch}")
             break
 
+    if best_state is None:
+        best_state = copy.deepcopy(model.state_dict())
+
     # Load best model
     model.load_state_dict(best_state)
 
@@ -381,7 +403,7 @@ def train_with_early_stopping(model_name, train_loader, val_loader, test_loader,
 # -----------------------
 # Save results
 # -----------------------
-def save_results(results):
+def save_results(results, input_dim):
     rows = []
 
     for item in results:
@@ -390,6 +412,7 @@ def save_results(results):
 
         row = {
             "model": item["model"],
+            "input_dim": input_dim,
             "best_epoch": item["best_epoch"],
             "best_threshold": item["best_threshold"],
 
@@ -406,17 +429,15 @@ def save_results(results):
 
         rows.append(row)
 
-    csv_path = os.path.join("experiments", "early_stopping_results.csv")
-    md_path = os.path.join("experiments", "early_stopping_results.md")
-
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+    with open(RESULTS_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
 
-    with open(md_path, "w", encoding="utf-8") as f:
+    with open(RESULTS_MD, "w", encoding="utf-8") as f:
         f.write("# Train/Validation/Test Early Stopping Results\n\n")
         f.write("This experiment uses a graph-level train/validation/test split.\n\n")
+        f.write(f"Input feature dimension: `{input_dim}`\n\n")
         f.write("The validation set is used for:\n\n")
         f.write("- early stopping\n")
         f.write("- selecting the probability threshold for class 1\n\n")
@@ -437,12 +458,13 @@ def save_results(results):
             f.write(f"- {case}\n")
 
         f.write("\n## Results\n\n")
-        f.write("| Model | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |\n")
-        f.write("|-------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|\n")
+        f.write("| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |\n")
+        f.write("|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|\n")
 
         for row in rows:
             f.write(
                 f"| {row['model']} "
+                f"| {row['input_dim']} "
                 f"| {row['best_epoch']} "
                 f"| {row['best_threshold']:.2f} "
                 f"| {row['val_precision_1']:.4f} "
@@ -455,8 +477,8 @@ def save_results(results):
             )
 
     print("\nSaved results:")
-    print(csv_path)
-    print(md_path)
+    print(RESULTS_CSV)
+    print(RESULTS_MD)
 
 
 # -----------------------
@@ -477,9 +499,12 @@ def main():
         test_dataset,
     )
 
+    input_dim = train_dataset[0].x.shape[1]
+
     print("\nTrain graphs:", TRAIN_CASES)
     print("Validation graphs:", VAL_CASES)
     print("Test graphs:", TEST_CASES)
+    print("Input feature dimension:", input_dim)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -504,6 +529,7 @@ def main():
             val_loader=val_loader,
             test_loader=test_loader,
             device=device,
+            input_dim=input_dim,
         )
 
         results.append(result)
@@ -523,7 +549,7 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    save_results(results)
+    save_results(results, input_dim=input_dim)
 
 
 if __name__ == "__main__":

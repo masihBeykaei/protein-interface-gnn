@@ -12,6 +12,31 @@ USE_CANDIDATE_FILTER = True
 MAX_CORR_EDGES = 3_000_000
 PROGRESS_EVERY = 2000
 
+# ----------------------------
+# Amino acid encoding
+# ----------------------------
+STANDARD_AA = [
+    "ALA", "ARG", "ASN", "ASP", "CYS",
+    "GLN", "GLU", "GLY", "HIS", "ILE",
+    "LEU", "LYS", "MET", "PHE", "PRO",
+    "SER", "THR", "TRP", "TYR", "VAL",
+]
+
+AA_TO_INDEX = {aa: i for i, aa in enumerate(STANDARD_AA)}
+
+
+def amino_acid_one_hot(resname):
+    """
+    Convert 3-letter amino acid code to one-hot vector.
+    Unknown residues are encoded as all zeros.
+    """
+    vec = np.zeros(len(STANDARD_AA), dtype=np.float32)
+
+    if resname in AA_TO_INDEX:
+        vec[AA_TO_INDEX[resname]] = 1.0
+
+    return vec
+
 
 # ----------------------------
 # Utility functions
@@ -31,9 +56,15 @@ def extract_partner_residues(model, chain_ids):
       etc.
 
     All residues from the listed chains are merged into one partner.
+
+    Returns:
+      residues_atoms: list of atom coordinates for each residue
+      ca_coords: C-alpha coordinates
+      residue_names: 3-letter amino acid names
     """
     residues_atoms = []
     ca_coords = []
+    residue_names = []
 
     for chain_id in chain_ids:
         if chain_id not in model:
@@ -45,7 +76,7 @@ def extract_partner_residues(model, chain_ids):
         chain = model[chain_id]
 
         for res in chain:
-            # keep only standard amino-acid residues
+            # Keep only standard protein residues
             if res.get_id()[0] != " ":
                 continue
 
@@ -56,8 +87,13 @@ def extract_partner_residues(model, chain_ids):
 
             residues_atoms.append(np.array(atoms, dtype=np.float32))
             ca_coords.append(res["CA"].get_coord())
+            residue_names.append(res.get_resname())
 
-    return residues_atoms, np.array(ca_coords, dtype=np.float32)
+    return (
+        residues_atoms,
+        np.array(ca_coords, dtype=np.float32),
+        residue_names,
+    )
 
 
 def build_edge_index_from_ca(ca_coords, threshold):
@@ -247,8 +283,14 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
     model0 = next(structure.get_models())
 
     try:
-        resA_atoms, caA = extract_partner_residues(model0, partner1_chains)
-        resB_atoms, caB = extract_partner_residues(model0, partner2_chains)
+        resA_atoms, caA, resA_names = extract_partner_residues(
+            model0,
+            partner1_chains
+        )
+        resB_atoms, caB, resB_names = extract_partner_residues(
+            model0,
+            partner2_chains
+        )
     except ValueError as e:
         print(f"Warning: {e}. Skipping {pdb_id}.")
         continue
@@ -298,16 +340,29 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
         CONTACT_THRESHOLD
     )
 
-    # Build node features
+    # Build node features:
+    # [CA_distance, degree_A, degree_B, aa_A_onehot(20), aa_B_onehot(20)]
     features = []
 
     for (a_idx, b_idx) in pairs:
         ca_dist = np.linalg.norm(caA[a_idx] - caB[b_idx])
         degA = degree_A[a_idx]
         degB = degree_B[b_idx]
-        features.append([ca_dist, degA, degB])
+
+        aaA_onehot = amino_acid_one_hot(resA_names[a_idx])
+        aaB_onehot = amino_acid_one_hot(resB_names[b_idx])
+
+        feature_vector = np.concatenate([
+            np.array([ca_dist, degA, degB], dtype=np.float32),
+            aaA_onehot,
+            aaB_onehot,
+        ])
+
+        features.append(feature_vector)
 
     features = np.array(features, dtype=np.float32)
+
+    print(f"Feature dimension: {features.shape[1]}")
 
     positive = int(labels.sum())
     negative = int(len(labels) - positive)
@@ -346,6 +401,7 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
         "positive": positive,
         "negative": negative,
         "edges": corr_edge_index.shape[1],
+        "feature_dim": features.shape[1],
     })
 
 
@@ -368,7 +424,8 @@ for item in summary:
         f"positive={item['positive']}, "
         f"negative={item['negative']}, "
         f"pos_ratio={ratio:.4f}, "
-        f"edges={item['edges']}"
+        f"edges={item['edges']}, "
+        f"feature_dim={item['feature_dim']}"
     )
 
 print("-------------------------------------------------")

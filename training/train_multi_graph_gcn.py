@@ -18,7 +18,7 @@ EPOCHS = 201
 LR = 0.01
 WEIGHT_DECAY = 5e-4
 BATCH_SIZE = 2
-NEGATIVE_RATIO = 5  # برای هر positive، چند negative در loss استفاده شود
+NEGATIVE_RATIO = 5
 
 PROCESSED_DIR = os.path.join("data", "processed")
 
@@ -44,6 +44,7 @@ CASES = [
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
+
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
@@ -73,6 +74,7 @@ def load_graph(case_name):
         return None
 
     positive = int(y.sum())
+
     if positive == 0:
         print(f"Skipping {case_name}: no positive nodes.")
         return None
@@ -91,32 +93,25 @@ dataset = []
 
 for case in CASES:
     graph = load_graph(case)
+
     if graph is not None:
         dataset.append(graph)
 
+
 print("\nLoaded graphs:")
+
 for data in dataset:
     print(
         f"{data.case_name}: nodes={data.num_nodes}, "
         f"edges={data.edge_index.shape[1]}, "
         f"positive={int(data.y.sum())}, "
-        f"negative={int(data.num_nodes - data.y.sum())}"
+        f"negative={int(data.num_nodes - data.y.sum())}, "
+        f"feature_dim={data.x.shape[1]}"
     )
+
 
 if len(dataset) < 2:
     raise RuntimeError("Not enough graphs loaded for multi-graph training.")
-
-
-# -----------------------
-# Normalize node features globally
-# -----------------------
-all_x = torch.cat([data.x for data in dataset], dim=0)
-mean = all_x.mean(dim=0)
-std = all_x.std(dim=0)
-std[std == 0] = 1.0
-
-for data in dataset:
-    data.x = (data.x - mean) / std
 
 
 # -----------------------
@@ -131,8 +126,38 @@ test_dataset = dataset[split_idx:]
 print("\nTrain graphs:", [d.case_name for d in train_dataset])
 print("Test graphs:", [d.case_name for d in test_dataset])
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+# -----------------------
+# Normalize node features
+# -----------------------
+# Use train statistics only to avoid leaking test information.
+all_train_x = torch.cat([data.x for data in train_dataset], dim=0)
+
+mean = all_train_x.mean(dim=0)
+std = all_train_x.std(dim=0)
+std[std == 0] = 1.0
+
+for data in train_dataset:
+    data.x = (data.x - mean) / std
+
+for data in test_dataset:
+    data.x = (data.x - mean) / std
+
+
+# -----------------------
+# DataLoaders
+# -----------------------
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=True,
+)
+
+test_loader = DataLoader(
+    test_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False,
+)
 
 
 # -----------------------
@@ -140,8 +165,9 @@ test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 # -----------------------
 def create_balanced_loss_mask(y, negative_ratio=5):
     """
-    Keeps all positive nodes and randomly samples negatives.
-    This balances the loss without removing graph structure.
+    Keeps all positive nodes and randomly samples negative nodes.
+    The full graph is still used for message passing.
+    Only the loss is computed on a balanced subset.
     """
     device = y.device
 
@@ -157,6 +183,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
     sampled_neg_idx = neg_idx[perm[:num_neg]]
 
     mask_idx = torch.cat([pos_idx, sampled_neg_idx])
+
     return mask_idx
 
 
@@ -164,8 +191,9 @@ def create_balanced_loss_mask(y, negative_ratio=5):
 # GCN Model
 # -----------------------
 class MultiGraphGCN(torch.nn.Module):
-    def __init__(self, in_channels=3, hidden_channels=32, out_channels=2):
+    def __init__(self, in_channels, hidden_channels=32, out_channels=2):
         super().__init__()
+
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, out_channels)
 
@@ -173,11 +201,25 @@ class MultiGraphGCN(torch.nn.Module):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
+
         return x
 
 
+# -----------------------
+# Device + Model
+# -----------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = MultiGraphGCN().to(device)
+
+print("\nDevice:", device)
+
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+
+
+input_dim = train_dataset[0].x.shape[1]
+print("Input feature dimension:", input_dim)
+
+model = MultiGraphGCN(in_channels=input_dim).to(device)
 
 optimizer = torch.optim.Adam(
     model.parameters(),
@@ -198,6 +240,7 @@ def evaluate(loader, name="Eval"):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
+
             out = model(batch.x, batch.edge_index)
             pred = out.argmax(dim=1)
 
@@ -227,7 +270,7 @@ for epoch in range(EPOCHS):
 
         loss_idx = create_balanced_loss_mask(
             batch.y,
-            negative_ratio=NEGATIVE_RATIO
+            negative_ratio=NEGATIVE_RATIO,
         )
 
         loss = F.cross_entropy(out[loss_idx], batch.y[loss_idx])

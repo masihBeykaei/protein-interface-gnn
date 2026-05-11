@@ -93,8 +93,10 @@ dataset = []
 
 for case in CASES:
     graph = load_graph(case)
+
     if graph is not None:
         dataset.append(graph)
+
 
 print("\nLoaded graphs:")
 
@@ -103,24 +105,13 @@ for data in dataset:
         f"{data.case_name}: nodes={data.num_nodes}, "
         f"edges={data.edge_index.shape[1]}, "
         f"positive={int(data.y.sum())}, "
-        f"negative={int(data.num_nodes - data.y.sum())}"
+        f"negative={int(data.num_nodes - data.y.sum())}, "
+        f"feature_dim={data.x.shape[1]}"
     )
+
 
 if len(dataset) < 2:
     raise RuntimeError("Not enough graphs loaded for multi-graph training.")
-
-
-# -----------------------
-# Normalize node features globally
-# -----------------------
-all_x = torch.cat([data.x for data in dataset], dim=0)
-
-mean = all_x.mean(dim=0)
-std = all_x.std(dim=0)
-std[std == 0] = 1.0
-
-for data in dataset:
-    data.x = (data.x - mean) / std
 
 
 # -----------------------
@@ -135,8 +126,38 @@ test_dataset = dataset[split_idx:]
 print("\nTrain graphs:", [d.case_name for d in train_dataset])
 print("Test graphs:", [d.case_name for d in test_dataset])
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+# -----------------------
+# Normalize node features
+# -----------------------
+# Use train statistics only to avoid leaking test information.
+all_train_x = torch.cat([data.x for data in train_dataset], dim=0)
+
+mean = all_train_x.mean(dim=0)
+std = all_train_x.std(dim=0)
+std[std == 0] = 1.0
+
+for data in train_dataset:
+    data.x = (data.x - mean) / std
+
+for data in test_dataset:
+    data.x = (data.x - mean) / std
+
+
+# -----------------------
+# DataLoaders
+# -----------------------
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=True,
+)
+
+test_loader = DataLoader(
+    test_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False,
+)
 
 
 # -----------------------
@@ -162,6 +183,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
     sampled_neg_idx = neg_idx[perm[:num_neg]]
 
     mask_idx = torch.cat([pos_idx, sampled_neg_idx])
+
     return mask_idx
 
 
@@ -171,7 +193,7 @@ def create_balanced_loss_mask(y, negative_ratio=5):
 class MultiGraphGAT(torch.nn.Module):
     def __init__(
         self,
-        in_channels=3,
+        in_channels,
         hidden_channels=16,
         heads=4,
         out_channels=2,
@@ -205,16 +227,25 @@ class MultiGraphGAT(torch.nn.Module):
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         x = self.gat2(x, edge_index)
+
         return x
 
 
+# -----------------------
+# Device + Model
+# -----------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 print("\nDevice:", device)
 
 if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
-model = MultiGraphGAT().to(device)
+
+input_dim = train_dataset[0].x.shape[1]
+print("Input feature dimension:", input_dim)
+
+model = MultiGraphGAT(in_channels=input_dim).to(device)
 
 optimizer = torch.optim.Adam(
     model.parameters(),

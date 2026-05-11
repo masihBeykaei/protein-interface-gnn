@@ -46,7 +46,7 @@ Each correspondence node represents:
 (residue_i, residue_j)
 ```
 
-Current feature vector:
+### Basic 3-Feature Representation
 
 ```text
 [CA_distance, degree_partner_1, degree_partner_2]
@@ -57,6 +57,26 @@ Features:
 - Cα distance between the two residues
 - Degree of residue `i` in partner 1 graph
 - Degree of residue `j` in partner 2 graph
+
+Input dimension:
+
+```text
+3
+```
+
+### Amino Acid One-Hot Representation
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
+```
+
+This adds biological residue identity information for both residues in the correspondence pair.
+
+Input dimension:
+
+```text
+43
+```
 
 ---
 
@@ -90,11 +110,9 @@ However, after adding DBD-style complexes, the number of positive samples increa
 
 ---
 
-## 5. Original Graph-Level Train/Test Split
+## 5. Initial Graph-Level Train/Test Split
 
 The initial multi-graph experiments used a graph-level train/test split.
-
-This means the model was evaluated on protein complexes that were not seen during training.
 
 ### Train Graphs
 
@@ -149,6 +167,7 @@ Configuration:
 ```text
 NEGATIVE_RATIO = 5
 threshold = 0.50
+features = basic 3 features
 ```
 
 ### Train Results
@@ -192,6 +211,7 @@ Configuration:
 ```text
 NEGATIVE_RATIO = 5
 threshold = 0.50
+features = basic 3 features
 ```
 
 ### Train Results
@@ -247,6 +267,8 @@ experiments/tune_negative_ratio.py
 
 This experiment compares GCN and GAT under different negative sampling ratios.
 
+Results were generated using the basic 3-feature representation.
+
 ### Test Set Results
 
 | Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
@@ -293,6 +315,8 @@ A node is predicted as positive if:
 P(class 1) >= threshold
 ```
 
+Results were generated using the basic 3-feature representation.
+
 ### Test Set Results
 
 | Model | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
@@ -308,7 +332,7 @@ P(class 1) >= threshold
 | GCN | 0.60 | 0.2400 | 0.1589 | 0.1912 | 0.9554 |
 | GCN | 0.70 | 0.2250 | 0.0596 | 0.0942 | 0.9620 |
 | GCN | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-| GCN | 0.90 | 0.0000 | 0.0000 | 0.9668 |
+| GCN | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
 | GAT | 0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
 | GAT | 0.10 | 0.0828 | 0.9603 | 0.1525 | 0.6456 |
 | GAT | 0.15 | 0.0927 | 0.9470 | 0.1688 | 0.6904 |
@@ -379,16 +403,16 @@ The test set is used only for final evaluation.
 - 1FSS_A_B
 - 3HMX_LH_AB
 
-### Results
+### Basic 3-Feature Results
 
-| Model | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
-| GCN | 7 | 0.50 | 0.3434 | 0.2787 | 0.3077 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| GAT | 56 | 0.50 | 0.1589 | 0.6721 | 0.2571 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
+| GCN | 3 | 7 | 0.50 | 0.3434 | 0.2787 | 0.3077 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 3 | 56 | 0.50 | 0.1589 | 0.6721 | 0.2571 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 
 ### Interpretation
 
-This is the most scientifically reliable experiment so far because the test set is not used for threshold selection or early stopping.
+This is the most scientifically reliable experiment for the basic feature representation because the test set is not used for threshold selection or early stopping.
 
 Under this setup:
 
@@ -399,53 +423,128 @@ Under this setup:
 
 ---
 
-## 13. Current Best Scientifically Reliable Result
+## 13. Amino Acid One-Hot Feature Experiment
+
+To enrich the node representation, amino acid identity was added as a biological feature.
+
+The original feature vector was:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2]
+```
+
+The new feature vector is:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
+```
+
+This increases the input feature dimension from:
+
+```text
+3 → 43
+```
+
+The goal was to test whether amino acid identity improves interface/contact prediction.
+
+### Train/Validation/Test Results with Amino Acid One-Hot Features
+
+| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
+| GCN | 43 | 11 | 0.40 | 0.1909 | 0.3443 | 0.2456 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| GAT | 43 | 34 | 0.40 | 0.1279 | 0.6885 | 0.2157 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+
+### Comparison with Basic 3-Feature Representation
+
+| Feature Set | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------------|---------------|-----------|---------------|
+| Basic 3 features | GCN | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | GAT | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot, 43 features | GCN | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot, 43 features | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+
+### Interpretation
+
+Adding amino acid one-hot features changed the behavior of both models.
+
+For GCN:
+
+- Recall increased from `0.1722` to `0.2781`
+- Precision decreased from `0.1940` to `0.1313`
+- F1-score slightly decreased from `0.1825` to `0.1783`
+
+For GAT:
+
+- Recall increased strongly from `0.3642` to `0.7285`
+- Precision decreased from `0.1746` to `0.1051`
+- F1-score decreased from `0.2361` to `0.1836`
+
+This suggests that amino acid identity makes the models more sensitive to positive/interface nodes, especially GAT, but also increases false positives.
+
+Under the strict train/validation/test protocol, the simpler 3-feature representation generalizes better in terms of positive-class F1-score.
+
+The amino acid one-hot experiment is still useful because it shows that biological features affect model behavior and can improve recall-oriented interface discovery.
+
+---
+
+## 14. Current Best Scientifically Reliable Result
 
 The most reliable setting is the train/validation/test split with validation-based early stopping.
 
-| Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|------------|-----------|------------------|---------------|-----------|---------------|
-| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Feature Set | Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------|-----------|------------------|---------------|-----------|---------------|
+| Basic 3 features | GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot, 43 features | GCN | 11 | 0.40 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 
 Current best model under the strict train/validation/test protocol:
 
 ```text
-GAT
+GAT with basic 3-feature representation
+```
+
+Best strict positive-class F1-score:
+
+```text
+0.2361
 ```
 
 ---
 
-## 14. Current Conclusion
+## 15. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
 - The dataset is still imbalanced, but it is large enough for meaningful multi-graph experiments.
 - GCN is conservative and often achieves higher accuracy.
 - GAT detects more positive interface/contact nodes.
-- In the most reliable train/validation/test setup, GAT outperforms GCN on positive-class F1-score.
-- Validation-based early stopping makes the evaluation more scientifically defensible.
-- Probability threshold tuning on test data showed useful behavior, but validation-based threshold selection is the preferred protocol.
+- In the strict train/validation/test setup, GAT outperforms GCN on positive-class F1-score when using the basic 3-feature representation.
+- Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
+- Under the current dataset and model settings, the basic 3-feature representation generalizes better in terms of positive-class F1-score.
+- The amino acid one-hot experiment is still valuable because it demonstrates that biological residue identity affects model behavior.
 
 ---
 
-## 15. Next Experiments
+## 16. Next Experiments
 
 Potential next steps:
 
-1. Add richer node features:
-   - amino acid type
+1. Add physicochemical residue features:
    - hydrophobicity
    - charge
-   - accessible surface area
-2. Visualize GAT attention weights.
-3. Compare different GAT head counts and hidden dimensions.
-4. Analyze false positives and false negatives.
-5. Add plots for:
+   - polarity
+   - aromaticity
+2. Add accessible surface area if feasible.
+3. Visualize GAT attention weights.
+4. Compare different GAT head counts and hidden dimensions.
+5. Analyze false positives and false negatives.
+6. Add plots for:
    - class imbalance
    - precision vs recall
    - F1-score comparison
    - negative ratio tuning results
    - threshold tuning results
    - early stopping results
-6. Prepare final report and presentation.
+   - feature engineering comparison
+7. Prepare final report and presentation.

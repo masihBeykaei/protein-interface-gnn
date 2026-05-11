@@ -2,7 +2,7 @@
 
 Residue-level protein–protein interface prediction using correspondence graphs and Graph Neural Networks (GCN & GAT).
 
-This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline and Graph Attention Networks.
+This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, and biological feature engineering.
 
 ---
 
@@ -18,7 +18,8 @@ Implemented so far:
 - Atomic-distance-based interface labeling
 - Correspondence graph generation
 - Candidate filtering to reduce graph size
-- Node feature engineering
+- Basic node feature engineering
+- Amino acid one-hot feature engineering
 - Single-graph GCN and GAT experiments on 1BRS
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
@@ -26,6 +27,7 @@ Implemented so far:
 - Negative sampling ratio tuning
 - Probability threshold tuning
 - Train/validation/test split with validation-based early stopping
+- Comparison between basic 3-feature representation and 43-dimensional amino acid one-hot representation
 
 ---
 
@@ -41,7 +43,15 @@ For each protein complex:
 6. Apply candidate filtering to reduce graph size.
 7. Build node features for each correspondence node.
 
-### Node Features
+A residue pair is labeled as positive if at least one atom pair between the two residues is closer than:
+
+```text
+5Å
+```
+
+---
+
+## 🧩 Node Features
 
 Each correspondence node represents a residue pair:
 
@@ -49,17 +59,43 @@ Each correspondence node represents a residue pair:
 (residue_i, residue_j)
 ```
 
-Current node features:
+### Basic Feature Vector
+
+The initial feature vector was:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2]
+```
+
+Features:
 
 - Cα distance between the two residues
 - Degree of residue `i` in partner 1 graph
 - Degree of residue `j` in partner 2 graph
 
-Feature vector:
+Input dimension:
 
 ```text
-[CA_distance, degree_partner_1, degree_partner_2]
+3
 ```
+
+### Amino Acid One-Hot Feature Vector
+
+A biological feature engineering experiment was added by encoding amino acid identity.
+
+New feature vector:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
+```
+
+Input dimension:
+
+```text
+43
+```
+
+This experiment tests whether residue identity helps the model detect protein–protein interface/contact pairs.
 
 ---
 
@@ -143,6 +179,7 @@ Current setup:
 - 2-layer GCN
 - CrossEntropy loss
 - Balanced loss mask for multi-graph training
+- Dynamic input dimension detection
 - Precision, Recall, and F1-score evaluation
 
 ### GAT
@@ -162,6 +199,7 @@ Current setup:
 - 4 attention heads
 - Dropout = 0.2
 - Balanced loss mask for multi-graph training
+- Dynamic input dimension detection
 - Designed to improve recall on positive interface nodes
 
 ---
@@ -190,6 +228,7 @@ Default setting:
 ```text
 NEGATIVE_RATIO = 5
 threshold = 0.50
+features = basic 3 features
 ```
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
@@ -227,16 +266,16 @@ Validation: 1DQJ, 1E6J
 Test:       1BRS, 1FSS, 3HMX
 ```
 
-### Results
+### Basic 3-Feature Results
 
-| Model | Best Epoch | Best Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|------------|----------------|------------------|---------------|-----------|---------------|
-| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Model | Input Dim | Best Epoch | Best Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------|----------------|------------------|---------------|-----------|---------------|
+| GCN | 3 | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| GAT | 3 | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 
 ### Interpretation
 
-This is the most scientifically reliable experiment so far because the test set is not used for early stopping or threshold selection.
+This is the most scientifically reliable experiment for the basic feature representation because the test set is not used for early stopping or threshold selection.
 
 Under this stricter setup:
 
@@ -245,12 +284,51 @@ Under this stricter setup:
 - GCN remains more conservative and has higher accuracy.
 - GAT is more suitable for interface discovery when finding more true interface pairs is important.
 
-Full experimental details are available in:
+---
+
+## 🧬 Amino Acid One-Hot Feature Experiment
+
+A biological feature engineering experiment was added by encoding amino acid identity.
+
+Original feature vector:
 
 ```text
-experiments/results_summary.md
-experiments/early_stopping_results.md
+[CA_distance, degree_partner_1, degree_partner_2]
 ```
+
+New feature vector:
+
+```text
+[CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
+```
+
+This increases the input feature dimension from:
+
+```text
+3 → 43
+```
+
+### Strict Train/Validation/Test Results
+
+| Feature Set | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------------|---------------|-----------|---------------|
+| Basic 3 features | GCN | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | GAT | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot, 43 features | GCN | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot, 43 features | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+
+### Interpretation
+
+Amino acid one-hot features increased recall, especially for GAT, but also increased false positives.
+
+The best strict result is still achieved by the GAT model using the basic 3-feature representation:
+
+```text
+GAT, basic 3 features
+Test F1 1 = 0.2361
+```
+
+The amino acid one-hot experiment is kept as a feature engineering experiment because it shows that biological residue identity affects model behavior and can be useful for recall-oriented interface discovery.
 
 ---
 
@@ -282,7 +360,7 @@ Script:
 experiments/tune_negative_ratio.py
 ```
 
-Results:
+Results with basic 3-feature representation:
 
 | Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|----------------|------------------|---------------|-----------|---------------|
@@ -329,6 +407,8 @@ experiments/tune_probability_threshold.py
 
 ### Best Thresholds by Positive-Class F1
 
+Results with basic 3-feature representation:
+
 | Model | Best Threshold | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |-------|----------------|-------------|----------|------|----------|
 | GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
@@ -349,15 +429,23 @@ experiments/threshold_tuning_results.csv
 
 The most reliable result currently comes from the train/validation/test experiment with validation-based early stopping.
 
-| Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|------------|-----------|------------------|---------------|-----------|---------------|
-| GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Feature Set | Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------|-----------|------------------|---------------|-----------|---------------|
+| Basic 3 features | GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot, 43 features | GCN | 11 | 0.40 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 
 Current best model under the strict protocol:
 
 ```text
-GAT
+GAT with basic 3-feature representation
+```
+
+Best strict positive-class F1-score:
+
+```text
+0.2361
 ```
 
 ---
@@ -479,7 +567,9 @@ protein-interface-gnn/
 │   ├── threshold_tuning_results.csv
 │   ├── train_val_test_early_stopping.py
 │   ├── early_stopping_results.md
-│   └── early_stopping_results.csv
+│   ├── early_stopping_results.csv
+│   ├── early_stopping_results_aa_onehot.md
+│   └── early_stopping_results_aa_onehot.csv
 │
 ├── utils/
 │
@@ -492,24 +582,25 @@ protein-interface-gnn/
 
 ## 🔬 Current Interpretation
 
-Current results show different behaviors between GCN and GAT:
+Current results show different behaviors between feature sets and models:
 
 - GCN is more conservative.
-- GCN often has higher accuracy because it predicts fewer positives.
 - GAT detects more true positive interface/contact nodes.
-- In the stricter train/validation/test setup, GAT achieves better positive-class F1-score than GCN.
-- Validation-based early stopping makes the evaluation more defensible.
-- For biological interface discovery, high recall can be useful because missing true interface residues may be more harmful than producing extra candidates.
+- In the strict train/validation/test setup, GAT with the basic 3-feature representation achieves the best positive-class F1-score.
+- Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
+- Under the current dataset and model settings, the simpler 3-feature representation generalizes better in terms of positive-class F1-score.
+- The amino acid one-hot experiment is still useful because it shows that biological residue identity affects model behavior.
 
 ---
 
 ## 🔜 Next Steps
 
-- Add richer node features:
-  - amino acid type
+- Add physicochemical residue features:
   - hydrophobicity
   - charge
-  - accessible surface area
+  - polarity
+  - aromaticity
+- Add accessible surface area if feasible.
 - Visualize GAT attention weights.
 - Tune GAT hidden dimensions and attention heads.
 - Analyze false positives and false negatives.
@@ -520,6 +611,7 @@ Current results show different behaviors between GCN and GAT:
   - negative ratio tuning results
   - threshold tuning results
   - early stopping results
+  - feature engineering comparison
 - Prepare final report and presentation.
 
 ---

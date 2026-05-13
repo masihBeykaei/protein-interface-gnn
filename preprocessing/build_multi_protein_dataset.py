@@ -2,6 +2,12 @@ import os
 import numpy as np
 from Bio.PDB import PDBParser
 
+try:
+    from Bio.PDB.SASA import ShrakeRupley
+except ImportError:
+    ShrakeRupley = None
+
+
 # ----------------------------
 # Config
 # ----------------------------
@@ -13,10 +19,12 @@ MAX_CORR_EDGES = 3_000_000
 PROGRESS_EVERY = 2000
 
 # Feature modes:
-#   "basic"             -> [CA_distance, degree_A, degree_B]
-#   "aa_onehot"         -> basic + aa_A_onehot(20) + aa_B_onehot(20)
-#   "physicochemical"   -> basic + hydrophobicity/charge/polarity/aromaticity for both residues
-FEATURE_MODE = "physicochemical"
+#   "basic"                -> [CA_distance, degree_A, degree_B]
+#   "aa_onehot"            -> basic + aa_A_onehot(20) + aa_B_onehot(20)
+#   "physicochemical"      -> basic + hydrophobicity/charge/polarity/aromaticity for both residues
+#   "basic_asa"            -> basic + ASA_A + ASA_B
+#   "physicochemical_asa"  -> physicochemical + ASA_A + ASA_B
+FEATURE_MODE = "basic"
 
 
 # ----------------------------
@@ -70,8 +78,6 @@ HYDROPHOBICITY = {
 }
 
 # Simple approximate charge at physiological pH
-# Positive: ARG, LYS, HIS
-# Negative: ASP, GLU
 CHARGE = {
     "ARG": 1.0,
     "LYS": 1.0,
@@ -118,6 +124,23 @@ def load_structure(pdb_path):
     return parser.get_structure("protein", pdb_path)
 
 
+def compute_residue_asa(model):
+    """
+    Compute residue-level accessible surface area using Biopython ShrakeRupley.
+
+    The computed residue ASA is attached to each residue as:
+      residue.sasa
+
+    If ShrakeRupley is unavailable, ASA values will default to 0.
+    """
+    if ShrakeRupley is None:
+        print("Warning: Bio.PDB.SASA.ShrakeRupley not available. ASA will be set to 0.")
+        return
+
+    sr = ShrakeRupley()
+    sr.compute(model, level="R")
+
+
 def extract_partner_residues(model, chain_ids):
     """
     chain_ids can be:
@@ -133,10 +156,12 @@ def extract_partner_residues(model, chain_ids):
       residues_atoms: list of atom coordinates for each residue
       ca_coords: C-alpha coordinates
       residue_names: 3-letter amino acid names
+      residue_asa: residue-level accessible surface area values
     """
     residues_atoms = []
     ca_coords = []
     residue_names = []
+    residue_asa = []
 
     for chain_id in chain_ids:
         if chain_id not in model:
@@ -161,10 +186,14 @@ def extract_partner_residues(model, chain_ids):
             ca_coords.append(res["CA"].get_coord())
             residue_names.append(res.get_resname())
 
+            asa_value = float(getattr(res, "sasa", 0.0))
+            residue_asa.append(asa_value)
+
     return (
         residues_atoms,
         np.array(ca_coords, dtype=np.float32),
         residue_names,
+        np.array(residue_asa, dtype=np.float32),
     )
 
 
@@ -318,6 +347,8 @@ def build_feature_vector(
     degree_B,
     resA_names,
     resB_names,
+    asaA,
+    asaB,
 ):
     """
     Build node features for one correspondence node.
@@ -328,6 +359,11 @@ def build_feature_vector(
 
     basic_features = np.array(
         [ca_dist, degA, degB],
+        dtype=np.float32,
+    )
+
+    asa_features = np.array(
+        [asaA[a_idx], asaB[b_idx]],
         dtype=np.float32,
     )
 
@@ -352,6 +388,23 @@ def build_feature_vector(
             basic_features,
             aaA_physchem,
             aaB_physchem,
+        ])
+
+    if FEATURE_MODE == "basic_asa":
+        return np.concatenate([
+            basic_features,
+            asa_features,
+        ])
+
+    if FEATURE_MODE == "physicochemical_asa":
+        aaA_physchem = physicochemical_features(resA_names[a_idx])
+        aaB_physchem = physicochemical_features(resB_names[b_idx])
+
+        return np.concatenate([
+            basic_features,
+            aaA_physchem,
+            aaB_physchem,
+            asa_features,
         ])
 
     raise ValueError(f"Unknown FEATURE_MODE: {FEATURE_MODE}")
@@ -404,12 +457,15 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
     structure = load_structure(pdb_file)
     model0 = next(structure.get_models())
 
+    # Compute residue-level ASA before extracting residues.
+    compute_residue_asa(model0)
+
     try:
-        resA_atoms, caA, resA_names = extract_partner_residues(
+        resA_atoms, caA, resA_names, asaA = extract_partner_residues(
             model0,
             partner1_chains
         )
-        resB_atoms, caB, resB_names = extract_partner_residues(
+        resB_atoms, caB, resB_names, asaB = extract_partner_residues(
             model0,
             partner2_chains
         )
@@ -475,6 +531,8 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
             degree_B=degree_B,
             resA_names=resA_names,
             resB_names=resB_names,
+            asaA=asaA,
+            asaB=asaB,
         )
 
         features.append(feature_vector)

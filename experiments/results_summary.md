@@ -608,7 +608,94 @@ python experiments/plot_results.py
 
 ---
 
-## 17. Current Best Scientifically Reliable Result
+## 17. Error Analysis
+
+Error analysis was performed for the current best strict protocol model:
+
+```text
+Model: GAT
+Features: basic 3 features
+Input dimension: 3
+Split: train/validation/test
+Threshold selected on validation set
+```
+
+Script:
+
+```text
+experiments/analyze_errors.py
+```
+
+Output files:
+
+```text
+experiments/error_analysis_gat_basic.csv
+experiments/error_analysis_gat_basic_summary.md
+```
+
+### Training Selection
+
+| Best Epoch | Best Threshold | Best Validation F1 1 |
+|------------|----------------|----------------------|
+| 56 | 0.50 | 0.2571 |
+
+### Test Metrics
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Confusion Matrix on Test Set
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 4137 | 260 |
+| True 1 | 96 | 55 |
+
+Definitions:
+
+- **False Positive (FP):** model predicted interface/contact, but the true label is non-contact.
+- **False Negative (FN):** model missed a true interface/contact pair.
+
+### Per-Test-Graph Error Summary
+
+| Case | Nodes | Positive | Negative | TP | TN | FP | FN |
+|------|-------|----------|----------|----|----|----|----|
+| 1BRS_A_B | 225 | 16 | 209 | 11 | 139 | 70 | 5 |
+| 1FSS_A_B | 2,013 | 63 | 1,950 | 19 | 1,862 | 88 | 44 |
+| 3HMX_LH_AB | 2,310 | 72 | 2,238 | 25 | 2,136 | 102 | 47 |
+
+### Error Analysis Interpretation
+
+The model produces more false positives than false negatives:
+
+```text
+False positives: 260
+False negatives: 96
+```
+
+This suggests that the best GAT model is sensitive to potential interface/contact patterns, but it is not yet highly precise.
+
+The model is likely assigning high probability to residue pairs that are geometrically or topologically similar to true contacts, even when they do not satisfy the strict atomic-distance contact label.
+
+The hardest test case is:
+
+```text
+3HMX_LH_AB
+```
+
+It has the largest number of both false positives and false negatives:
+
+```text
+FP = 102
+FN = 47
+```
+
+This suggests that generalization difficulty varies across protein complexes.
+
+---
+
+## 18. Current Best Scientifically Reliable Result
 
 The most reliable setting is the train/validation/test split with validation-based early stopping.
 
@@ -635,7 +722,7 @@ Best strict positive-class F1-score:
 
 ---
 
-## 18. Current Conclusion
+## 19. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
@@ -648,16 +735,17 @@ Best strict positive-class F1-score:
 - Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
 - Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
 - Visualization plots make the experimental comparisons easier to interpret and report.
+- Error analysis shows that the best GAT model produces more false positives than false negatives, suggesting that the model is sensitive but not yet highly precise.
 
 ---
 
-## 19. Next Experiments
+## 20. Next Experiments
 
 Potential next steps:
 
 1. Add accessible surface area if feasible.
 2. Visualize GAT attention weights.
 3. Compare different GAT head counts and hidden dimensions.
-4. Analyze false positives and false negatives.
+4. Analyze false positives and false negatives in structural context.
 5. Add report-ready figures to the final report and presentation.
 6. Prepare final report and presentation.

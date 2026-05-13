@@ -2,7 +2,7 @@
 
 Residue-level protein–protein interface prediction using correspondence graphs and Graph Neural Networks (GCN & GAT).
 
-This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, biological feature engineering, and visualization of experimental results.
+This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, biological feature engineering, result visualization, and error analysis.
 
 ---
 
@@ -33,6 +33,7 @@ Implemented so far:
   - 43-dimensional amino acid one-hot representation
   - 11-dimensional physicochemical representation
 - Experiment result visualization plots
+- Error analysis for the best strict GAT model
 
 ---
 
@@ -554,6 +555,72 @@ python experiments/plot_results.py
 
 ---
 
+## 🔎 Error Analysis
+
+Error analysis was performed for the current best strict protocol model:
+
+```text
+Model: GAT
+Features: basic 3 features
+Input dimension: 3
+Split: train/validation/test
+Threshold selected on validation set
+```
+
+Script:
+
+```text
+experiments/analyze_errors.py
+```
+
+Output files:
+
+```text
+experiments/error_analysis_gat_basic.csv
+experiments/error_analysis_gat_basic_summary.md
+```
+
+### Test Metrics
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Confusion Matrix on Test Set
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 4137 | 260 |
+| True 1 | 96 | 55 |
+
+Definitions:
+
+- **False Positive (FP):** model predicted interface/contact, but the true label is non-contact.
+- **False Negative (FN):** model missed a true interface/contact pair.
+
+### Per-Test-Graph Error Summary
+
+| Case | Nodes | Positive | Negative | TP | TN | FP | FN |
+|------|-------|----------|----------|----|----|----|----|
+| 1BRS_A_B | 225 | 16 | 209 | 11 | 139 | 70 | 5 |
+| 1FSS_A_B | 2,013 | 63 | 1,950 | 19 | 1,862 | 88 | 44 |
+| 3HMX_LH_AB | 2,310 | 72 | 2,238 | 25 | 2,136 | 102 | 47 |
+
+### Interpretation
+
+The model produces more false positives than false negatives:
+
+```text
+False positives: 260
+False negatives: 96
+```
+
+This indicates that the model is relatively sensitive to possible interface/contact residue pairs, but it often predicts additional non-contact pairs as positives.
+
+The hardest test graph is `3HMX_LH_AB`, which has the largest number of both false positives and false negatives. This suggests that generalization difficulty varies across protein complexes.
+
+---
+
 ## 🏆 Current Best Scientifically Reliable Result
 
 The most reliable result currently comes from the train/validation/test experiment with validation-based early stopping.
@@ -680,6 +747,12 @@ python experiments/train_val_test_early_stopping.py
 python experiments/plot_results.py
 ```
 
+### 10. Run error analysis
+
+```bash
+python experiments/analyze_errors.py
+```
+
 ---
 
 ## 📂 Project Structure
@@ -712,6 +785,9 @@ protein-interface-gnn/
 ├── experiments/
 │   ├── results_summary.md
 │   ├── plot_results.py
+│   ├── analyze_errors.py
+│   ├── error_analysis_gat_basic.csv
+│   ├── error_analysis_gat_basic_summary.md
 │   ├── tune_negative_ratio.py
 │   ├── negative_ratio_tuning_results.md
 │   ├── negative_ratio_tuning_results.csv
@@ -757,6 +833,7 @@ Current results show different behaviors between feature sets and models:
 - Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
 - Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
 - Visualization plots make the experimental comparisons easier to interpret and report.
+- Error analysis shows that the best GAT model produces more false positives than false negatives, suggesting that the model is sensitive but not yet highly precise.
 
 ---
 
@@ -765,7 +842,7 @@ Current results show different behaviors between feature sets and models:
 - Add accessible surface area if feasible.
 - Visualize GAT attention weights.
 - Tune GAT hidden dimensions and attention heads.
-- Analyze false positives and false negatives.
+- Analyze false positives and false negatives in structural context.
 - Add report-ready figures to the final report and presentation.
 - Prepare final report and presentation.
 

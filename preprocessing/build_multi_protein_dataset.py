@@ -12,8 +12,15 @@ USE_CANDIDATE_FILTER = True
 MAX_CORR_EDGES = 3_000_000
 PROGRESS_EVERY = 2000
 
+# Feature modes:
+#   "basic"             -> [CA_distance, degree_A, degree_B]
+#   "aa_onehot"         -> basic + aa_A_onehot(20) + aa_B_onehot(20)
+#   "physicochemical"   -> basic + hydrophobicity/charge/polarity/aromaticity for both residues
+FEATURE_MODE = "physicochemical"
+
+
 # ----------------------------
-# Amino acid encoding
+# Amino acid encodings
 # ----------------------------
 STANDARD_AA = [
     "ALA", "ARG", "ASN", "ASP", "CYS",
@@ -36,6 +43,71 @@ def amino_acid_one_hot(resname):
         vec[AA_TO_INDEX[resname]] = 1.0
 
     return vec
+
+
+# Kyte-Doolittle hydrophobicity scale
+HYDROPHOBICITY = {
+    "ILE": 4.5,
+    "VAL": 4.2,
+    "LEU": 3.8,
+    "PHE": 2.8,
+    "CYS": 2.5,
+    "MET": 1.9,
+    "ALA": 1.8,
+    "GLY": -0.4,
+    "THR": -0.7,
+    "SER": -0.8,
+    "TRP": -0.9,
+    "TYR": -1.3,
+    "PRO": -1.6,
+    "HIS": -3.2,
+    "GLU": -3.5,
+    "GLN": -3.5,
+    "ASP": -3.5,
+    "ASN": -3.5,
+    "LYS": -3.9,
+    "ARG": -4.5,
+}
+
+# Simple approximate charge at physiological pH
+# Positive: ARG, LYS, HIS
+# Negative: ASP, GLU
+CHARGE = {
+    "ARG": 1.0,
+    "LYS": 1.0,
+    "HIS": 1.0,
+    "ASP": -1.0,
+    "GLU": -1.0,
+}
+
+POLAR_AA = {
+    "ARG", "ASN", "ASP", "GLN", "GLU",
+    "HIS", "LYS", "SER", "THR", "TYR", "CYS",
+}
+
+AROMATIC_AA = {
+    "PHE", "TRP", "TYR", "HIS",
+}
+
+
+def physicochemical_features(resname):
+    """
+    Return compact physicochemical features for a residue.
+
+    Features:
+      [hydrophobicity, charge, polarity, aromaticity]
+
+    Unknown residues are encoded as zeros.
+    """
+    hydrophobicity = HYDROPHOBICITY.get(resname, 0.0)
+    charge = CHARGE.get(resname, 0.0)
+    polarity = 1.0 if resname in POLAR_AA else 0.0
+    aromaticity = 1.0 if resname in AROMATIC_AA else 0.0
+
+    return np.array(
+        [hydrophobicity, charge, polarity, aromaticity],
+        dtype=np.float32,
+    )
 
 
 # ----------------------------
@@ -237,6 +309,54 @@ def build_correspondence_edges(
     return np.array(edges_undirected, dtype=np.int64).T
 
 
+def build_feature_vector(
+    a_idx,
+    b_idx,
+    caA,
+    caB,
+    degree_A,
+    degree_B,
+    resA_names,
+    resB_names,
+):
+    """
+    Build node features for one correspondence node.
+    """
+    ca_dist = np.linalg.norm(caA[a_idx] - caB[b_idx])
+    degA = degree_A[a_idx]
+    degB = degree_B[b_idx]
+
+    basic_features = np.array(
+        [ca_dist, degA, degB],
+        dtype=np.float32,
+    )
+
+    if FEATURE_MODE == "basic":
+        return basic_features
+
+    if FEATURE_MODE == "aa_onehot":
+        aaA_onehot = amino_acid_one_hot(resA_names[a_idx])
+        aaB_onehot = amino_acid_one_hot(resB_names[b_idx])
+
+        return np.concatenate([
+            basic_features,
+            aaA_onehot,
+            aaB_onehot,
+        ])
+
+    if FEATURE_MODE == "physicochemical":
+        aaA_physchem = physicochemical_features(resA_names[a_idx])
+        aaB_physchem = physicochemical_features(resB_names[b_idx])
+
+        return np.concatenate([
+            basic_features,
+            aaA_physchem,
+            aaB_physchem,
+        ])
+
+    raise ValueError(f"Unknown FEATURE_MODE: {FEATURE_MODE}")
+
+
 # ----------------------------
 # Multi-protein dataset cases
 # ----------------------------
@@ -269,6 +389,8 @@ out_dir = os.path.join("data", "processed")
 os.makedirs(out_dir, exist_ok=True)
 
 summary = []
+
+print(f"Feature mode: {FEATURE_MODE}")
 
 for pdb_id, (partner1_chains, partner2_chains) in cases.items():
     print(f"\nProcessing {pdb_id} ({partner1_chains} vs {partner2_chains}) ...")
@@ -340,23 +462,20 @@ for pdb_id, (partner1_chains, partner2_chains) in cases.items():
         CONTACT_THRESHOLD
     )
 
-    # Build node features:
-    # [CA_distance, degree_A, degree_B, aa_A_onehot(20), aa_B_onehot(20)]
+    # Build node features
     features = []
 
     for (a_idx, b_idx) in pairs:
-        ca_dist = np.linalg.norm(caA[a_idx] - caB[b_idx])
-        degA = degree_A[a_idx]
-        degB = degree_B[b_idx]
-
-        aaA_onehot = amino_acid_one_hot(resA_names[a_idx])
-        aaB_onehot = amino_acid_one_hot(resB_names[b_idx])
-
-        feature_vector = np.concatenate([
-            np.array([ca_dist, degA, degB], dtype=np.float32),
-            aaA_onehot,
-            aaB_onehot,
-        ])
+        feature_vector = build_feature_vector(
+            a_idx=a_idx,
+            b_idx=b_idx,
+            caA=caA,
+            caB=caB,
+            degree_A=degree_A,
+            degree_B=degree_B,
+            resA_names=resA_names,
+            resB_names=resB_names,
+        )
 
         features.append(feature_vector)
 

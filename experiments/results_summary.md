@@ -573,7 +573,42 @@ This suggests that compact biological residue properties are more stable than on
 
 ---
 
-## 16. Current Best Scientifically Reliable Result
+## 16. Experiment Figures
+
+Generated plots are stored in:
+
+```text
+experiments/figures/
+```
+
+Figures include:
+
+| File | Description |
+|------|-------------|
+| `class_imbalance.png` | Positive vs negative correspondence node counts |
+| `feature_set_f1_comparison.png` | Positive-class F1 comparison across feature sets |
+| `feature_set_precision_recall_f1.png` | Precision, recall, and F1 comparison across feature sets |
+| `best_strict_gcn_vs_gat.png` | GCN vs GAT under the strict train/validation/test protocol |
+| `negative_ratio_tuning_gcn.png` | Negative sampling ratio tuning for GCN |
+| `negative_ratio_tuning_gat.png` | Negative sampling ratio tuning for GAT |
+| `threshold_tuning_gcn.png` | Probability threshold tuning for GCN |
+| `threshold_tuning_gat.png` | Probability threshold tuning for GAT |
+
+Plotting script:
+
+```text
+experiments/plot_results.py
+```
+
+Generate all figures with:
+
+```bash
+python experiments/plot_results.py
+```
+
+---
+
+## 17. Current Best Scientifically Reliable Result
 
 The most reliable setting is the train/validation/test split with validation-based early stopping.
 
@@ -600,7 +635,7 @@ Best strict positive-class F1-score:
 
 ---
 
-## 17. Current Conclusion
+## 18. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
@@ -612,10 +647,11 @@ Best strict positive-class F1-score:
 - Physicochemical features are more compact and improve over one-hot features for GAT, but still do not outperform the basic 3-feature representation.
 - Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
 - Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
+- Visualization plots make the experimental comparisons easier to interpret and report.
 
 ---
 
-## 18. Next Experiments
+## 19. Next Experiments
 
 Potential next steps:
 
@@ -623,12 +659,5 @@ Potential next steps:
 2. Visualize GAT attention weights.
 3. Compare different GAT head counts and hidden dimensions.
 4. Analyze false positives and false negatives.
-5. Add plots for:
-   - class imbalance
-   - precision vs recall
-   - F1-score comparison
-   - negative ratio tuning results
-   - threshold tuning results
-   - early stopping results
-   - feature engineering comparison
+5. Add report-ready figures to the final report and presentation.
 6. Prepare final report and presentation.

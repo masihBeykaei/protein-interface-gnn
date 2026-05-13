@@ -2,7 +2,7 @@
 
 Residue-level protein–protein interface prediction using correspondence graphs and Graph Neural Networks (GCN & GAT).
 
-This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, and biological feature engineering.
+This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, biological feature engineering, and visualization of experimental results.
 
 ---
 
@@ -32,6 +32,7 @@ Implemented so far:
   - basic 3-feature representation
   - 43-dimensional amino acid one-hot representation
   - 11-dimensional physicochemical representation
+- Experiment result visualization plots
 
 ---
 
@@ -518,6 +519,41 @@ experiments/threshold_tuning_results.csv
 
 ---
 
+## 📊 Experiment Figures
+
+Generated plots are stored in:
+
+```text
+experiments/figures/
+```
+
+Figures include:
+
+| File | Description |
+|------|-------------|
+| `class_imbalance.png` | Positive vs negative correspondence node counts |
+| `feature_set_f1_comparison.png` | Positive-class F1 comparison across feature sets |
+| `feature_set_precision_recall_f1.png` | Precision, recall, and F1 comparison across feature sets |
+| `best_strict_gcn_vs_gat.png` | GCN vs GAT under the strict train/validation/test protocol |
+| `negative_ratio_tuning_gcn.png` | Negative sampling ratio tuning for GCN |
+| `negative_ratio_tuning_gat.png` | Negative sampling ratio tuning for GAT |
+| `threshold_tuning_gcn.png` | Probability threshold tuning for GCN |
+| `threshold_tuning_gat.png` | Probability threshold tuning for GAT |
+
+Plotting script:
+
+```text
+experiments/plot_results.py
+```
+
+Generate all figures with:
+
+```bash
+python experiments/plot_results.py
+```
+
+---
+
 ## 🏆 Current Best Scientifically Reliable Result
 
 The most reliable result currently comes from the train/validation/test experiment with validation-based early stopping.
@@ -554,6 +590,7 @@ Best strict positive-class F1-score:
 - Biopython
 - NumPy
 - scikit-learn
+- matplotlib
 
 Tested on:
 
@@ -637,6 +674,12 @@ python experiments/tune_probability_threshold.py
 python experiments/train_val_test_early_stopping.py
 ```
 
+### 9. Generate experiment plots
+
+```bash
+python experiments/plot_results.py
+```
+
 ---
 
 ## 📂 Project Structure
@@ -668,6 +711,7 @@ protein-interface-gnn/
 │
 ├── experiments/
 │   ├── results_summary.md
+│   ├── plot_results.py
 │   ├── tune_negative_ratio.py
 │   ├── negative_ratio_tuning_results.md
 │   ├── negative_ratio_tuning_results.csv
@@ -680,7 +724,17 @@ protein-interface-gnn/
 │   ├── early_stopping_results_aa_onehot.md
 │   ├── early_stopping_results_aa_onehot.csv
 │   ├── early_stopping_results_physicochemical.md
-│   └── early_stopping_results_physicochemical.csv
+│   ├── early_stopping_results_physicochemical.csv
+│   └── figures/
+│       ├── README.md
+│       ├── class_imbalance.png
+│       ├── feature_set_f1_comparison.png
+│       ├── feature_set_precision_recall_f1.png
+│       ├── best_strict_gcn_vs_gat.png
+│       ├── negative_ratio_tuning_gcn.png
+│       ├── negative_ratio_tuning_gat.png
+│       ├── threshold_tuning_gcn.png
+│       └── threshold_tuning_gat.png
 │
 ├── utils/
 │
@@ -702,6 +756,7 @@ Current results show different behaviors between feature sets and models:
 - Physicochemical features are more compact and perform better than one-hot features for GAT, but still do not outperform the basic 3-feature representation.
 - Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
 - Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
+- Visualization plots make the experimental comparisons easier to interpret and report.
 
 ---
 
@@ -711,14 +766,7 @@ Current results show different behaviors between feature sets and models:
 - Visualize GAT attention weights.
 - Tune GAT hidden dimensions and attention heads.
 - Analyze false positives and false negatives.
-- Add plots for:
-  - class imbalance
-  - precision vs recall
-  - F1-score comparison
-  - negative ratio tuning results
-  - threshold tuning results
-  - early stopping results
-  - feature engineering comparison
+- Add report-ready figures to the final report and presentation.
 - Prepare final report and presentation.
 
 ---

@@ -2,7 +2,7 @@
 
 Residue-level protein–protein interface prediction using correspondence graphs and Graph Neural Networks (GCN & GAT).
 
-This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, biological feature engineering, result visualization, and error analysis.
+This project is inspired by the paper **"Graph Neural Networks for the Prediction of Protein–Protein Interfaces"** and extends the idea using a simplified residue-level graph pipeline, Graph Attention Networks, multi-protein experiments, biological feature engineering, result visualization, attention analysis, hyperparameter tuning, and error analysis.
 
 ---
 
@@ -21,6 +21,7 @@ Implemented so far:
 - Basic node feature engineering
 - Amino acid one-hot feature engineering
 - Physicochemical residue feature engineering
+- Accessible surface area feature engineering
 - Single-graph GCN and GAT experiments on 1BRS
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
@@ -28,12 +29,16 @@ Implemented so far:
 - Negative sampling ratio tuning
 - Probability threshold tuning
 - Train/validation/test split with validation-based early stopping
+- GAT hyperparameter tuning
+- GAT attention weight extraction and refinement
 - Comparison between:
   - basic 3-feature representation
   - 43-dimensional amino acid one-hot representation
   - 11-dimensional physicochemical representation
+  - 5-dimensional basic + ASA representation
 - Experiment result visualization plots
 - Error analysis for the best strict GAT model
+- Final project report
 
 ---
 
@@ -48,6 +53,7 @@ For each protein complex:
 5. Label residue-pair nodes as positive if any atom pair is closer than 5Å.
 6. Apply candidate filtering to reduce graph size.
 7. Build node features for each correspondence node.
+8. Save processed graph arrays as NumPy files.
 
 A residue pair is labeled as positive if at least one atom pair between the two residues is closer than:
 
@@ -132,6 +138,32 @@ Input dimension:
 ```
 
 This representation aims to provide biologically meaningful residue information without using a high-dimensional sparse one-hot encoding.
+
+### Basic + ASA Feature Vector
+
+Accessible surface area was added as a structural feature.
+
+Feature vector:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  ASA_A,
+  ASA_B
+]
+```
+
+Input dimension:
+
+```text
+5
+```
+
+ASA values are computed at the residue level using Biopython's Shrake-Rupley implementation.
+
+This representation tests whether residue surface exposure improves interface/contact prediction.
 
 ---
 
@@ -228,15 +260,21 @@ training/train_single_graph_gat_tuned.py
 training/train_multi_graph_gat.py
 ```
 
-Current setup:
+Current best GAT setup:
 
-- 2-layer GAT
-- 16 hidden units
-- 4 attention heads
-- Dropout = 0.2
-- Balanced loss mask for multi-graph training
+```text
+hidden_channels = 16
+heads = 4
+dropout = 0.2
+```
+
+The GAT model uses:
+
+- 2 GAT layers
+- Balanced loss mask
 - Dynamic input dimension detection
-- Designed to improve recall on positive interface nodes
+- Validation-based early stopping
+- Validation-based threshold selection
 
 ---
 
@@ -364,8 +402,6 @@ GAT, basic 3 features
 Test F1 1 = 0.2361
 ```
 
-The amino acid one-hot experiment is kept as a feature engineering experiment because it shows that biological residue identity affects model behavior and can be useful for recall-oriented interface discovery.
-
 ---
 
 ## 🧪 Physicochemical Feature Experiment
@@ -416,14 +452,63 @@ GAT one-hot F1:          0.1836
 GAT physicochemical F1:  0.2037
 ```
 
-However, the best strict result is still achieved by the GAT model using the basic 3-feature representation:
+However, the best strict result is still achieved by the GAT model using the basic 3-feature representation.
+
+---
+
+## 🧫 Accessible Surface Area Feature Experiment
+
+Accessible surface area was added as a structural residue-level feature.
+
+Feature vector:
 
 ```text
-GAT, basic 3 features
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  ASA_A,
+  ASA_B
+]
+```
+
+This increases the input dimension from:
+
+```text
+3 → 5
+```
+
+### Strict Train/Validation/Test Results
+
+| Feature Set | Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------|-----------|------------------|---------------|-----------|---------------|
+| Basic + ASA, 5 features | GCN | 35 | 0.60 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| Basic + ASA, 5 features | GAT | 191 | 0.50 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
+
+### Interpretation
+
+ASA features substantially improved GCN compared with the basic 3-feature GCN:
+
+```text
+GCN basic F1:       0.1825
+GCN basic + ASA F1: 0.2204
+```
+
+For GAT, ASA increased precision but reduced recall compared with the basic 3-feature GAT:
+
+```text
+GAT basic F1:       0.2361
+GAT basic + ASA F1: 0.2338
+```
+
+The best strict result remains:
+
+```text
+GAT with basic 3 features
 Test F1 1 = 0.2361
 ```
 
-This suggests that compact biological features are more stable than sparse one-hot features in this setup, but the current dataset still generalizes best with simple geometric/topological features.
+However, ASA is a useful feature because it improved structural sensitivity for GCN and produced a more precision-oriented GAT model.
 
 ---
 
@@ -520,6 +605,48 @@ experiments/threshold_tuning_results.csv
 
 ---
 
+## 🔧 GAT Hyperparameter Tuning
+
+GAT hyperparameters were tuned using the strict train/validation/test protocol.
+
+Script:
+
+```text
+experiments/tune_gat_hyperparameters.py
+```
+
+Search space:
+
+| Hidden Channels | Heads | Dropout |
+|----------------|-------|---------|
+| 16 | 4 | 0.2 |
+| 32 | 4 | 0.2 |
+| 16 | 8 | 0.2 |
+| 32 | 8 | 0.2 |
+| 16 | 4 | 0.3 |
+
+### Results
+
+| Hidden | Heads | Dropout | Val F1 1 | Test F1 1 |
+|--------|-------|---------|----------|-----------|
+| 16 | 4 | 0.2 | 0.2571 | 0.2361 |
+| 32 | 4 | 0.2 | 0.2526 | 0.1980 |
+| 16 | 8 | 0.2 | 0.2531 | 0.2069 |
+| 32 | 8 | 0.2 | 0.2457 | 0.1899 |
+| 16 | 4 | 0.3 | 0.2534 | 0.2118 |
+
+The best configuration remains:
+
+```text
+hidden_channels = 16
+heads = 4
+dropout = 0.2
+```
+
+This suggests that larger GAT configurations do not improve generalization under the current dataset size.
+
+---
+
 ## 📊 Experiment Figures
 
 Generated plots are stored in:
@@ -540,6 +667,8 @@ Figures include:
 | `negative_ratio_tuning_gat.png` | Negative sampling ratio tuning for GAT |
 | `threshold_tuning_gcn.png` | Probability threshold tuning for GCN |
 | `threshold_tuning_gat.png` | Probability threshold tuning for GAT |
+| `gat_attention_distribution.png` | Distribution of GAT attention weights |
+| `gat_attention_distribution_log.png` | Log-scale distribution of GAT attention weights |
 
 Plotting script:
 
@@ -593,11 +722,6 @@ experiments/error_analysis_gat_basic_summary.md
 | True 0 | 4137 | 260 |
 | True 1 | 96 | 55 |
 
-Definitions:
-
-- **False Positive (FP):** model predicted interface/contact, but the true label is non-contact.
-- **False Negative (FN):** model missed a true interface/contact pair.
-
 ### Per-Test-Graph Error Summary
 
 | Case | Nodes | Positive | Negative | TP | TN | FP | FN |
@@ -606,8 +730,6 @@ Definitions:
 | 1FSS_A_B | 2,013 | 63 | 1,950 | 19 | 1,862 | 88 | 44 |
 | 3HMX_LH_AB | 2,310 | 72 | 2,238 | 25 | 2,136 | 102 | 47 |
 
-### Interpretation
-
 The model produces more false positives than false negatives:
 
 ```text
@@ -615,9 +737,55 @@ False positives: 260
 False negatives: 96
 ```
 
-This indicates that the model is relatively sensitive to possible interface/contact residue pairs, but it often predicts additional non-contact pairs as positives.
+This indicates that the best GAT model is sensitive but not yet highly precise.
 
-The hardest test graph is `3HMX_LH_AB`, which has the largest number of both false positives and false negatives. This suggests that generalization difficulty varies across protein complexes.
+---
+
+## 👁️ GAT Attention Analysis
+
+Attention weights were extracted from the first GATConv layer of the best strict model.
+
+Scripts:
+
+```text
+experiments/visualize_gat_attention.py
+experiments/refine_gat_attention_analysis.py
+```
+
+Output files include:
+
+```text
+experiments/gat_attention_summary.md
+experiments/gat_attention_refined_summary.md
+experiments/gat_attention_top_edges.csv
+experiments/gat_attention_top_non_self_edges.csv
+experiments/gat_attention_top_predicted_positive_edges.csv
+experiments/gat_attention_top_tp_context_edges.csv
+experiments/gat_attention_top_fp_context_edges.csv
+experiments/gat_attention_top_fn_context_edges.csv
+experiments/gat_attention_error_context_edges.csv
+```
+
+The full attention table is large and is intentionally not tracked in Git:
+
+```text
+experiments/gat_attention_weights.csv
+```
+
+### Interpretation
+
+Raw top attention edges were dominated by self-loops, especially in the hardest test complex `3HMX_LH_AB`.
+
+The refined analysis removes self-loop dominance and separates attention edges by prediction context:
+
+- non-self edges
+- predicted-positive context
+- true-positive context
+- false-positive context
+- false-negative context
+- FP/FN error context
+
+GAT attention should be interpreted as local message-passing importance, not as a direct global biological importance score.
 
 ---
 
@@ -633,6 +801,8 @@ The most reliable result currently comes from the train/validation/test experime
 | Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 | Physicochemical, 11 features | GCN | 24 | 0.60 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
 | Physicochemical, 11 features | GAT | 22 | 0.50 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+| Basic + ASA, 5 features | GCN | 35 | 0.60 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| Basic + ASA, 5 features | GAT | 191 | 0.50 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
 Current best model under the strict protocol:
 
@@ -644,6 +814,13 @@ Best strict positive-class F1-score:
 
 ```text
 0.2361
+```
+
+The ASA-based GAT model is very close:
+
+```text
+GAT with basic + ASA features
+Test F1 1 = 0.2338
 ```
 
 ---
@@ -685,12 +862,14 @@ python preprocessing/build_multi_protein_dataset.py
 
 This generates correspondence graph labels, node features, residue pairs, and edge indices for all configured complexes.
 
-The current preprocessing script supports feature modes:
+The preprocessing script supports feature modes:
 
 ```text
 basic
 aa_onehot
 physicochemical
+basic_asa
+physicochemical_asa
 ```
 
 The feature mode can be changed in:
@@ -741,16 +920,29 @@ python experiments/tune_probability_threshold.py
 python experiments/train_val_test_early_stopping.py
 ```
 
-### 9. Generate experiment plots
+### 9. Tune GAT hyperparameters
+
+```bash
+python experiments/tune_gat_hyperparameters.py
+```
+
+### 10. Generate experiment plots
 
 ```bash
 python experiments/plot_results.py
 ```
 
-### 10. Run error analysis
+### 11. Run error analysis
 
 ```bash
 python experiments/analyze_errors.py
+```
+
+### 12. Run GAT attention analysis
+
+```bash
+python experiments/visualize_gat_attention.py
+python experiments/refine_gat_attention_analysis.py
 ```
 
 ---
@@ -786,21 +978,26 @@ protein-interface-gnn/
 │   ├── results_summary.md
 │   ├── plot_results.py
 │   ├── analyze_errors.py
-│   ├── error_analysis_gat_basic.csv
-│   ├── error_analysis_gat_basic_summary.md
+│   ├── visualize_gat_attention.py
+│   ├── refine_gat_attention_analysis.py
+│   ├── tune_gat_hyperparameters.py
 │   ├── tune_negative_ratio.py
-│   ├── negative_ratio_tuning_results.md
-│   ├── negative_ratio_tuning_results.csv
 │   ├── tune_probability_threshold.py
-│   ├── threshold_tuning_results.md
-│   ├── threshold_tuning_results.csv
 │   ├── train_val_test_early_stopping.py
+│   ├── gat_hyperparameter_tuning_results.md
+│   ├── gat_hyperparameter_tuning_results.csv
+│   ├── gat_attention_summary.md
+│   ├── gat_attention_refined_summary.md
+│   ├── error_analysis_gat_basic_summary.md
+│   ├── error_analysis_gat_basic.csv
 │   ├── early_stopping_results.md
 │   ├── early_stopping_results.csv
 │   ├── early_stopping_results_aa_onehot.md
 │   ├── early_stopping_results_aa_onehot.csv
 │   ├── early_stopping_results_physicochemical.md
 │   ├── early_stopping_results_physicochemical.csv
+│   ├── early_stopping_results_basic_asa.md
+│   ├── early_stopping_results_basic_asa.csv
 │   └── figures/
 │       ├── README.md
 │       ├── class_imbalance.png
@@ -810,7 +1007,12 @@ protein-interface-gnn/
 │       ├── negative_ratio_tuning_gcn.png
 │       ├── negative_ratio_tuning_gat.png
 │       ├── threshold_tuning_gcn.png
-│       └── threshold_tuning_gat.png
+│       ├── threshold_tuning_gat.png
+│       ├── gat_attention_distribution.png
+│       └── gat_attention_distribution_log.png
+│
+├── report/
+│   └── final_report.md
 │
 ├── utils/
 │
@@ -830,26 +1032,29 @@ Current results show different behaviors between feature sets and models:
 - In the strict train/validation/test setup, GAT with the basic 3-feature representation achieves the best positive-class F1-score.
 - Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
 - Physicochemical features are more compact and perform better than one-hot features for GAT, but still do not outperform the basic 3-feature representation.
-- Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
-- Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
-- Visualization plots make the experimental comparisons easier to interpret and report.
+- ASA features substantially improve GCN and make GAT more precise.
+- Basic + ASA GAT is very close to the best model, but the best F1 remains GAT with basic 3 features.
+- Larger GAT configurations do not improve generalization on the current dataset.
+- Attention analysis is useful for local message-passing interpretation, but raw attention should not be treated as direct biological importance.
 - Error analysis shows that the best GAT model produces more false positives than false negatives, suggesting that the model is sensitive but not yet highly precise.
 
 ---
 
-## 🔜 Next Steps
+## 🔜 Remaining Next Steps
 
-- Add accessible surface area if feasible.
-- Visualize GAT attention weights.
-- Tune GAT hidden dimensions and attention heads.
-- Analyze false positives and false negatives in structural context.
-- Add report-ready figures to the final report and presentation.
-- Prepare final report and presentation.
+Most planned next steps have been completed. Remaining useful extensions include:
+
+- Analyze false positives and false negatives in 3D structural context.
+- Add structural visualization of predicted interface pairs.
+- Try protein language model embeddings.
+- Expand the dataset with more protein complexes.
+- Prepare a presentation/deck for final delivery.
 
 ---
 
 ## 📌 Notes
 
 - Raw PDB files and processed `.npy` files should not be committed to GitHub.
+- Large generated attention files should not be committed to GitHub.
 - The repository contains the reproducible preprocessing and training pipeline.
 - The processed dataset can be regenerated by running the preprocessing scripts.

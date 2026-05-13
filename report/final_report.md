@@ -8,6 +8,8 @@ In this project, the goal is to predict residue-level protein–protein interfac
 
 The project implements and evaluates Graph Neural Network models, specifically Graph Convolutional Networks (GCN) and Graph Attention Networks (GAT), under a multi-protein experimental setting.
 
+The project also includes feature engineering, class imbalance handling, hyperparameter tuning, visualization, GAT attention analysis, and error analysis.
+
 ---
 
 ## 2. Project Goal
@@ -47,6 +49,7 @@ The core idea is to model proteins as graphs and use graph neural networks to le
 - multi-protein training and evaluation
 - class imbalance handling
 - feature engineering experiments
+- attention analysis
 - error analysis
 
 ---
@@ -91,12 +94,13 @@ For each protein complex, the preprocessing pipeline performs the following step
 3. Extract standard amino acid residues.
 4. Store all atom coordinates for each residue.
 5. Extract Cα coordinates for residue-level graph construction.
-6. Build intra-chain residue graphs using Cα distance.
-7. Apply candidate filtering to reduce correspondence graph size.
-8. Build correspondence nodes.
-9. Label correspondence nodes using atom-level distance.
-10. Build correspondence graph edges.
-11. Save processed graph data as NumPy files.
+6. Optionally compute residue-level accessible surface area.
+7. Build intra-partner residue graphs using Cα distance.
+8. Apply candidate filtering to reduce correspondence graph size.
+9. Build correspondence nodes.
+10. Label correspondence nodes using atom-level distance.
+11. Build correspondence graph edges.
+12. Save processed graph data as NumPy files.
 
 The processed files saved for each complex are:
 
@@ -195,7 +199,7 @@ This significantly reduces the number of correspondence nodes while keeping like
 
 ## 9. Node Features
 
-Three feature representations were tested.
+Four feature representations were tested.
 
 ### 9.1 Basic 3-Feature Representation
 
@@ -204,12 +208,6 @@ The basic feature vector is:
 ```text
 [CA_distance, degree_partner_1, degree_partner_2]
 ```
-
-Features:
-
-- Cα distance between the two residues
-- Degree of residue in partner 1 graph
-- Degree of residue in partner 2 graph
 
 Input dimension:
 
@@ -261,6 +259,30 @@ Input dimension:
 11
 ```
 
+### 9.4 Basic + Accessible Surface Area Representation
+
+This representation adds residue-level accessible surface area.
+
+Feature vector:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  ASA_A,
+  ASA_B
+]
+```
+
+Input dimension:
+
+```text
+5
+```
+
+ASA values are computed using Biopython's Shrake-Rupley implementation.
+
 ---
 
 ## 10. Models
@@ -285,7 +307,7 @@ The GAT model uses two attention-based graph layers:
 GATConv → ELU → GATConv
 ```
 
-The GAT model uses:
+The best GAT configuration is:
 
 ```text
 hidden_channels = 16
@@ -454,7 +476,7 @@ Under this strict protocol, GAT achieves the best positive-class F1-score.
 
 ## 18. Feature Engineering Results
 
-Three feature sets were compared under the strict protocol.
+Four feature sets were compared under the strict protocol.
 
 | Feature Set | Input Dim | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |------------|-----------|-------|------------------|---------------|-----------|---------------|
@@ -464,6 +486,8 @@ Three feature sets were compared under the strict protocol.
 | Amino acid one-hot | 43 | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 | Physicochemical | 11 | GCN | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
 | Physicochemical | 11 | GAT | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+| Basic + ASA | 5 | GCN | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| Basic + ASA | 5 | GAT | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
 ### Interpretation
 
@@ -473,11 +497,37 @@ Amino acid one-hot features increased recall, especially for GAT, but also intro
 
 Physicochemical features performed better than amino acid one-hot features for GAT, but still did not outperform the basic representation.
 
-This suggests that, under the current dataset size and model settings, simple geometric and topological features generalize better than the tested biological feature extensions.
+ASA features substantially improved GCN and produced a more precision-oriented GAT model. The ASA-based GAT result is very close to the best model, but slightly lower in F1-score.
+
+This suggests that, under the current dataset size and model settings, simple geometric and topological features still generalize best, while structural features such as ASA are promising.
 
 ---
 
-## 19. Current Best Model
+## 19. GAT Hyperparameter Tuning
+
+A small GAT hyperparameter grid was tested under the strict protocol.
+
+| Hidden | Heads | Dropout | Val F1 1 | Test F1 1 |
+|--------|-------|---------|----------|-----------|
+| 16 | 4 | 0.2 | 0.2571 | 0.2361 |
+| 32 | 4 | 0.2 | 0.2526 | 0.1980 |
+| 16 | 8 | 0.2 | 0.2531 | 0.2069 |
+| 32 | 8 | 0.2 | 0.2457 | 0.1899 |
+| 16 | 4 | 0.3 | 0.2534 | 0.2118 |
+
+The best configuration remained:
+
+```text
+hidden_channels = 16
+heads = 4
+dropout = 0.2
+```
+
+Larger GAT models did not improve generalization, likely due to limited dataset size and class imbalance.
+
+---
+
+## 20. Current Best Model
 
 The best scientifically reliable result is:
 
@@ -497,9 +547,20 @@ Performance:
 
 This model achieves the highest positive-class F1-score under the strict train/validation/test protocol.
 
+The closest alternative is:
+
+```text
+Model: GAT
+Feature set: Basic + ASA
+Input dimension: 5
+Best epoch: 191
+Threshold: 0.50
+Test F1 1: 0.2338
+```
+
 ---
 
-## 20. Error Analysis
+## 21. Error Analysis
 
 Error analysis was performed for the best model:
 
@@ -554,7 +615,37 @@ This indicates that some protein complexes are more difficult to generalize to t
 
 ---
 
-## 21. Visualization
+## 22. GAT Attention Analysis
+
+Attention weights were extracted from the first GATConv layer of the best strict GAT model.
+
+Scripts:
+
+```text
+experiments/visualize_gat_attention.py
+experiments/refine_gat_attention_analysis.py
+```
+
+The refined attention analysis creates several attention subsets:
+
+- top non-self attention edges
+- top edges connected to predicted-positive nodes
+- top edges connected to true-positive nodes
+- top edges connected to false-positive nodes
+- top edges connected to false-negative nodes
+- top edges connected to FP/FN error nodes
+
+### Interpretation
+
+Raw top attention edges were dominated by self-loops, especially in the hardest test complex.
+
+The refined attention analysis removes self-loop dominance and makes the attention results more interpretable by separating them into prediction and error contexts.
+
+However, GAT attention is normalized over local neighborhoods. Therefore, attention weights should be interpreted as local message-passing importance rather than global biological importance.
+
+---
+
+## 23. Visualization
 
 Several figures were generated for easier interpretation:
 
@@ -570,24 +661,30 @@ Generated figures include:
 - GCN vs GAT strict protocol comparison
 - negative ratio tuning curves
 - threshold tuning curves
+- GAT attention distribution
+- log-scale GAT attention distribution
 
 These plots help summarize the experimental results visually and are useful for presentations or final reporting.
 
 ---
 
-## 22. Discussion
+## 24. Discussion
 
 The experiments show that graph neural networks can learn useful patterns for protein–protein interface prediction, but the task remains challenging due to severe class imbalance and limited dataset size.
 
 The GAT model generally detects more true interface pairs than GCN. However, this comes with increased false positives. This behavior is useful in biological discovery settings where missing true interface residues may be more harmful than producing extra candidates, but precision must be improved for practical deployment.
 
-Feature engineering experiments showed that adding biological residue identity or physicochemical properties changes model behavior. Amino acid one-hot features increased recall, while physicochemical features were more stable. However, neither feature set outperformed the basic geometric/topological representation under the strict evaluation protocol.
+Feature engineering experiments showed that adding biological residue identity or physicochemical properties changes model behavior. Amino acid one-hot features increased recall, while physicochemical features were more stable. ASA features improved GCN and made GAT more precise, but did not surpass the basic GAT F1-score.
 
-This suggests that current model performance is driven strongly by geometric proximity and graph topology. Richer biological features may require larger datasets, better normalization, or more expressive models to improve generalization.
+This suggests that current model performance is driven strongly by geometric proximity and graph topology. Richer biological or structural features may require larger datasets, better normalization, or more expressive models to improve generalization.
+
+GAT hyperparameter tuning showed that increasing model size did not improve performance. This suggests that the current limitation is more likely data size, class imbalance, or feature representation rather than insufficient model capacity.
+
+Attention analysis provided insight into local message-passing behavior. However, raw attention weights should not be interpreted directly as biological importance scores.
 
 ---
 
-## 23. Limitations
+## 25. Limitations
 
 Several limitations remain:
 
@@ -597,30 +694,32 @@ Several limitations remain:
 4. Labels are based on a fixed 5Å atom-distance threshold.
 5. Candidate filtering may remove some potentially useful context.
 6. Biological features were simple and manually defined.
-7. No pretrained protein language model embeddings were used.
-8. The model was evaluated only on selected complexes.
-9. Error analysis is not yet linked back to 3D structural visualization.
+7. ASA was computed directly from the available complex structures.
+8. No pretrained protein language model embeddings were used.
+9. The model was evaluated only on selected complexes.
+10. Error analysis is not yet linked back to 3D structural visualization.
+11. Attention weights provide local message-passing explanations but not direct biological importance.
 
 ---
 
-## 24. Future Work
+## 26. Future Work
 
 Possible next steps include:
 
 1. Add more protein complexes.
-2. Add solvent accessible surface area features.
-3. Add residue embeddings from protein language models.
-4. Tune GAT hidden dimensions and attention heads.
-5. Visualize GAT attention weights.
-6. Analyze false positives and false negatives in 3D structure.
-7. Compare with non-GNN baselines.
-8. Use cross-validation across protein complexes.
-9. Improve negative sampling strategies.
-10. Explore edge features based on distance or residue geometry.
+2. Add residue embeddings from protein language models.
+3. Analyze false positives and false negatives in 3D structure.
+4. Visualize predicted interface pairs on protein structures.
+5. Compare with non-GNN baselines.
+6. Use cross-validation across protein complexes.
+7. Improve negative sampling strategies.
+8. Explore edge features based on distance or residue geometry.
+9. Add structural features beyond ASA.
+10. Prepare a final presentation/deck.
 
 ---
 
-## 25. Conclusion
+## 27. Conclusion
 
 This project implemented a complete graph-based pipeline for residue-level protein–protein interface prediction.
 
@@ -634,8 +733,10 @@ The pipeline includes:
 - class imbalance handling
 - hyperparameter tuning
 - feature engineering
+- accessible surface area features
 - visualization
 - error analysis
+- GAT attention analysis
 
 The best model under the strict train/validation/test protocol is:
 
@@ -652,6 +753,13 @@ Test F1 1        = 0.2361
 Test Accuracy    = 0.9217
 ```
 
+The closest feature-engineered alternative is:
+
+```text
+GAT with basic + ASA features
+Test F1 1 = 0.2338
+```
+
 The results show that GAT is more effective than GCN for detecting positive interface/contact residue pairs in this setup. However, false positives remain a major challenge.
 
-Overall, the project demonstrates that graph neural networks are a promising approach for protein–protein interface prediction and provides a strong foundation for future improvements using larger datasets, richer biological features, and structural error analysis.
+Overall, the project demonstrates that graph neural networks are a promising approach for protein–protein interface prediction and provides a strong foundation for future improvements using larger datasets, richer structural features, pretrained protein embeddings, and structural error visualization.

@@ -52,12 +52,6 @@ Each correspondence node represents:
 [CA_distance, degree_partner_1, degree_partner_2]
 ```
 
-Features:
-
-- Cα distance between the two residues
-- Degree of residue `i` in partner 1 graph
-- Degree of residue `j` in partner 2 graph
-
 Input dimension:
 
 ```text
@@ -69,8 +63,6 @@ Input dimension:
 ```text
 [CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
 ```
-
-This adds biological residue identity information for both residues in the correspondence pair.
 
 Input dimension:
 
@@ -96,12 +88,28 @@ Input dimension:
 ]
 ```
 
-This adds compact biological residue properties for both residues in the correspondence pair.
-
 Input dimension:
 
 ```text
 11
+```
+
+### Basic + Accessible Surface Area Representation
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  ASA_A,
+  ASA_B
+]
+```
+
+Input dimension:
+
+```text
+5
 ```
 
 ---
@@ -131,8 +139,7 @@ The current multi-protein dataset includes original examples and DBD-style prote
 |------------|----------------|----------------|----------------|
 | 20,707 | 698 | 20,009 | 0.0337 |
 
-The dataset is highly imbalanced, which is expected in protein–protein interface prediction.  
-However, after adding DBD-style complexes, the number of positive samples increased significantly.
+The dataset is highly imbalanced, which is expected in protein–protein interface prediction.
 
 ---
 
@@ -315,14 +322,6 @@ Results were generated using the basic 3-feature representation.
 | GCN | 5 | 0.2059 | 0.3245 | 0.2519 |
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 |
 
-### Interpretation
-
-For GCN, `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.  
-However, `NEGATIVE_RATIO = 3` produces almost the same F1-score with much higher recall.
-
-For GAT, `NEGATIVE_RATIO = 5` gives the best positive-class F1-score.  
-However, `NEGATIVE_RATIO = 2` and `3` achieve much higher recall and may be useful for recall-oriented interface discovery.
-
 ---
 
 ## 11. Probability Threshold Tuning Experiment
@@ -333,8 +332,6 @@ Script:
 experiments/tune_probability_threshold.py
 ```
 
-This experiment evaluates different probability thresholds for predicting the positive class.
-
 A node is predicted as positive if:
 
 ```text
@@ -343,47 +340,12 @@ P(class 1) >= threshold
 
 Results were generated using the basic 3-feature representation.
 
-### Test Set Results
-
-| Model | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|-----------|------------------|---------------|-----------|---------------|
-| GCN | 0.05 | 0.0865 | 0.9603 | 0.1586 | 0.6618 |
-| GCN | 0.10 | 0.1008 | 0.9073 | 0.1815 | 0.7282 |
-| GCN | 0.15 | 0.1139 | 0.8411 | 0.2006 | 0.7775 |
-| GCN | 0.20 | 0.1247 | 0.7748 | 0.2149 | 0.8120 |
-| GCN | 0.25 | 0.1377 | 0.7086 | 0.2306 | 0.8430 |
-| GCN | 0.30 | 0.1444 | 0.6159 | 0.2340 | 0.8661 |
-| GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
-| GCN | 0.50 | 0.2059 | 0.3245 | 0.2519 | 0.9360 |
-| GCN | 0.60 | 0.2400 | 0.1589 | 0.1912 | 0.9554 |
-| GCN | 0.70 | 0.2250 | 0.0596 | 0.0942 | 0.9620 |
-| GCN | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-| GCN | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-| GAT | 0.05 | 0.0719 | 0.9868 | 0.1341 | 0.5770 |
-| GAT | 0.10 | 0.0828 | 0.9603 | 0.1525 | 0.6456 |
-| GAT | 0.15 | 0.0927 | 0.9470 | 0.1688 | 0.6904 |
-| GAT | 0.20 | 0.1011 | 0.9404 | 0.1825 | 0.7203 |
-| GAT | 0.25 | 0.1073 | 0.9338 | 0.1925 | 0.7399 |
-| GAT | 0.30 | 0.1117 | 0.9205 | 0.1993 | 0.7544 |
-| GAT | 0.40 | 0.1179 | 0.8477 | 0.2070 | 0.7843 |
-| GAT | 0.50 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
-| GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
-| GAT | 0.70 | 0.1881 | 0.1258 | 0.1508 | 0.9529 |
-| GAT | 0.80 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-| GAT | 0.90 | 0.0000 | 0.0000 | 0.0000 | 0.9668 |
-
 ### Best Thresholds by Positive-Class F1
 
 | Model | Best Threshold | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |-------|----------------|-------------|----------|------|----------|
 | GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
 | GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
-
-### Interpretation
-
-For GCN, lowering the threshold from `0.50` to `0.40` improves the positive-class F1-score.
-
-For GAT, increasing the threshold from `0.50` to `0.60` improves the positive-class F1-score by reducing false positives.
 
 Threshold tuning shows that probability calibration can slightly improve both models, especially when the dataset is highly imbalanced.
 
@@ -440,40 +402,23 @@ The test set is used only for final evaluation.
 
 This is the most scientifically reliable experiment for the basic feature representation because the test set is not used for threshold selection or early stopping.
 
-Under this setup:
-
-- GAT achieves higher positive-class F1-score on the test set.
-- GAT achieves substantially higher recall than GCN.
-- GCN remains more conservative, with higher accuracy but lower recall.
-- GAT is more suitable for interface discovery when finding more true interface pairs is important.
-
 ---
 
 ## 13. Amino Acid One-Hot Feature Experiment
 
-To enrich the node representation, amino acid identity was added as a biological feature.
-
-The original feature vector was:
-
-```text
-[CA_distance, degree_partner_1, degree_partner_2]
-```
-
-The new feature vector is:
+The amino acid one-hot feature vector is:
 
 ```text
 [CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
 ```
 
-This increases the input feature dimension from:
+Input dimension:
 
 ```text
-3 → 43
+43
 ```
 
-The goal was to test whether amino acid identity improves interface/contact prediction.
-
-### Train/Validation/Test Results with Amino Acid One-Hot Features
+### Train/Validation/Test Results
 
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
@@ -482,33 +427,13 @@ The goal was to test whether amino acid identity improves interface/contact pred
 
 ### Interpretation
 
-Adding amino acid one-hot features changed the behavior of both models.
-
-For GCN:
-
-- Recall increased from `0.1722` to `0.2781`
-- Precision decreased from `0.1940` to `0.1313`
-- F1-score slightly decreased from `0.1825` to `0.1783`
-
-For GAT:
-
-- Recall increased strongly from `0.3642` to `0.7285`
-- Precision decreased from `0.1746` to `0.1051`
-- F1-score decreased from `0.2361` to `0.1836`
-
-This suggests that amino acid identity makes the models more sensitive to positive/interface nodes, especially GAT, but also increases false positives.
-
-Under the strict train/validation/test protocol, the simpler 3-feature representation generalizes better in terms of positive-class F1-score.
-
-The amino acid one-hot experiment is still useful because it shows that biological features affect model behavior and can improve recall-oriented interface discovery.
+Adding amino acid one-hot features increased recall, especially for GAT, but also increased false positives.
 
 ---
 
 ## 14. Physicochemical Feature Experiment
 
-To test a compact biological feature representation, residue-level physicochemical properties were added.
-
-The feature vector is:
+The physicochemical feature vector is:
 
 ```text
 [
@@ -526,15 +451,13 @@ The feature vector is:
 ]
 ```
 
-This increases the input feature dimension from:
+Input dimension:
 
 ```text
-3 → 11
+11
 ```
 
-The goal was to test whether compact biological features generalize better than sparse amino acid one-hot encodings.
-
-### Train/Validation/Test Results with Physicochemical Features
+### Train/Validation/Test Results
 
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
@@ -543,24 +466,48 @@ The goal was to test whether compact biological features generalize better than 
 
 ### Interpretation
 
-Compared with amino acid one-hot features, physicochemical features improved GAT positive-class F1-score:
-
-```text
-GAT one-hot F1:          0.1836
-GAT physicochemical F1:  0.2037
-```
-
-However, physicochemical features still did not outperform the basic 3-feature representation:
-
-```text
-GAT basic 3-feature F1:  0.2361
-```
-
-This suggests that compact biological residue properties are more stable than one-hot amino acid identity in this setup, but the current dataset still generalizes best with simple geometric/topological features.
+Compared with amino acid one-hot features, physicochemical features improved GAT positive-class F1-score, but still did not outperform the basic 3-feature representation.
 
 ---
 
-## 15. Feature Set Comparison
+## 15. Accessible Surface Area Feature Experiment
+
+Accessible surface area was added as a structural residue-level feature.
+
+The feature vector is:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  ASA_A,
+  ASA_B
+]
+```
+
+Input dimension:
+
+```text
+5
+```
+
+### Train/Validation/Test Results
+
+| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
+| GCN | 5 | 35 | 0.60 | 0.2251 | 0.5000 | 0.3104 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| GAT | 5 | 191 | 0.50 | 0.3050 | 0.3525 | 0.3270 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
+
+### Interpretation
+
+ASA features improved GCN substantially compared with the basic 3-feature GCN.
+
+For GAT, ASA increased precision but reduced recall. The final F1-score is very close to the best basic GAT result, but slightly lower.
+
+---
+
+## 16. Feature Set Comparison
 
 | Feature Set | Input Dim | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |------------|-----------|-------|------------------|---------------|-----------|---------------|
@@ -570,10 +517,48 @@ This suggests that compact biological residue properties are more stable than on
 | Amino acid one-hot | 43 | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 | Physicochemical | 11 | GCN | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
 | Physicochemical | 11 | GAT | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+| Basic + ASA | 5 | GCN | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| Basic + ASA | 5 | GAT | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
 ---
 
-## 16. Experiment Figures
+## 17. GAT Hyperparameter Tuning
+
+Script:
+
+```text
+experiments/tune_gat_hyperparameters.py
+```
+
+The experiment tuned:
+
+- hidden channels
+- number of attention heads
+- dropout
+
+### Results
+
+| Hidden | Heads | Dropout | Val F1 1 | Test F1 1 |
+|--------|-------|---------|----------|-----------|
+| 16 | 4 | 0.2 | 0.2571 | 0.2361 |
+| 32 | 4 | 0.2 | 0.2526 | 0.1980 |
+| 16 | 8 | 0.2 | 0.2531 | 0.2069 |
+| 32 | 8 | 0.2 | 0.2457 | 0.1899 |
+| 16 | 4 | 0.3 | 0.2534 | 0.2118 |
+
+The best configuration remains:
+
+```text
+hidden_channels = 16
+heads = 4
+dropout = 0.2
+```
+
+This suggests that larger GAT models do not improve generalization on the current dataset.
+
+---
+
+## 18. Experiment Figures
 
 Generated plots are stored in:
 
@@ -593,22 +578,12 @@ Figures include:
 | `negative_ratio_tuning_gat.png` | Negative sampling ratio tuning for GAT |
 | `threshold_tuning_gcn.png` | Probability threshold tuning for GCN |
 | `threshold_tuning_gat.png` | Probability threshold tuning for GAT |
-
-Plotting script:
-
-```text
-experiments/plot_results.py
-```
-
-Generate all figures with:
-
-```bash
-python experiments/plot_results.py
-```
+| `gat_attention_distribution.png` | Distribution of GAT attention weights |
+| `gat_attention_distribution_log.png` | Log-scale distribution of GAT attention weights |
 
 ---
 
-## 17. Error Analysis
+## 19. Error Analysis
 
 Error analysis was performed for the current best strict protocol model:
 
@@ -624,13 +599,6 @@ Script:
 
 ```text
 experiments/analyze_errors.py
-```
-
-Output files:
-
-```text
-experiments/error_analysis_gat_basic.csv
-experiments/error_analysis_gat_basic_summary.md
 ```
 
 ### Training Selection
@@ -652,11 +620,6 @@ experiments/error_analysis_gat_basic_summary.md
 | True 0 | 4137 | 260 |
 | True 1 | 96 | 55 |
 
-Definitions:
-
-- **False Positive (FP):** model predicted interface/contact, but the true label is non-contact.
-- **False Negative (FN):** model missed a true interface/contact pair.
-
 ### Per-Test-Graph Error Summary
 
 | Case | Nodes | Positive | Negative | TP | TN | FP | FN |
@@ -676,26 +639,57 @@ False negatives: 96
 
 This suggests that the best GAT model is sensitive to potential interface/contact patterns, but it is not yet highly precise.
 
-The model is likely assigning high probability to residue pairs that are geometrically or topologically similar to true contacts, even when they do not satisfy the strict atomic-distance contact label.
+---
 
-The hardest test case is:
+## 20. GAT Attention Analysis
 
-```text
-3HMX_LH_AB
-```
+Attention weights were extracted from the first GATConv layer of the best strict GAT model.
 
-It has the largest number of both false positives and false negatives:
+Scripts:
 
 ```text
-FP = 102
-FN = 47
+experiments/visualize_gat_attention.py
+experiments/refine_gat_attention_analysis.py
 ```
 
-This suggests that generalization difficulty varies across protein complexes.
+### Attention Output Files
+
+```text
+experiments/gat_attention_summary.md
+experiments/gat_attention_refined_summary.md
+experiments/gat_attention_top_edges.csv
+experiments/gat_attention_top_non_self_edges.csv
+experiments/gat_attention_top_predicted_positive_edges.csv
+experiments/gat_attention_top_tp_context_edges.csv
+experiments/gat_attention_top_fp_context_edges.csv
+experiments/gat_attention_top_fn_context_edges.csv
+experiments/gat_attention_error_context_edges.csv
+```
+
+The full attention table is intentionally not committed because it is large:
+
+```text
+experiments/gat_attention_weights.csv
+```
+
+### Interpretation
+
+Raw top attention edges were dominated by self-loops. The refined attention analysis removes self-loop dominance and separates attention edges by prediction context.
+
+Attention subsets include:
+
+- non-self edges
+- predicted-positive context
+- true-positive context
+- false-positive context
+- false-negative context
+- FP/FN error context
+
+GAT attention weights are locally normalized, so they should be interpreted as local message-passing importance rather than global biological importance.
 
 ---
 
-## 18. Current Best Scientifically Reliable Result
+## 21. Current Best Scientifically Reliable Result
 
 The most reliable setting is the train/validation/test split with validation-based early stopping.
 
@@ -707,6 +701,8 @@ The most reliable setting is the train/validation/test split with validation-bas
 | Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 | Physicochemical, 11 features | GCN | 24 | 0.60 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
 | Physicochemical, 11 features | GAT | 22 | 0.50 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+| Basic + ASA, 5 features | GCN | 35 | 0.60 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
+| Basic + ASA, 5 features | GAT | 191 | 0.50 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
 Current best model under the strict train/validation/test protocol:
 
@@ -720,9 +716,15 @@ Best strict positive-class F1-score:
 0.2361
 ```
 
+The Basic + ASA GAT model is very close:
+
+```text
+Test F1 1 = 0.2338
+```
+
 ---
 
-## 19. Current Conclusion
+## 22. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
@@ -732,20 +734,20 @@ Best strict positive-class F1-score:
 - In the strict train/validation/test setup, GAT outperforms GCN on positive-class F1-score when using the basic 3-feature representation.
 - Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
 - Physicochemical features are more compact and improve over one-hot features for GAT, but still do not outperform the basic 3-feature representation.
-- Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
-- Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
-- Visualization plots make the experimental comparisons easier to interpret and report.
-- Error analysis shows that the best GAT model produces more false positives than false negatives, suggesting that the model is sensitive but not yet highly precise.
+- ASA features substantially improve GCN and produce a more precision-oriented GAT.
+- The best overall strict F1 remains GAT with basic 3 features.
+- Larger GAT models did not improve generalization.
+- Attention analysis is useful for local explanation, but raw attention is not a direct biological importance score.
+- Error analysis shows that the best GAT model produces more false positives than false negatives.
 
 ---
 
-## 20. Next Experiments
+## 23. Remaining Next Experiments
 
 Potential next steps:
 
-1. Add accessible surface area if feasible.
-2. Visualize GAT attention weights.
-3. Compare different GAT head counts and hidden dimensions.
-4. Analyze false positives and false negatives in structural context.
-5. Add report-ready figures to the final report and presentation.
-6. Prepare final report and presentation.
+1. Analyze false positives and false negatives in 3D structural context.
+2. Add structural visualization of predicted interface pairs.
+3. Add protein language model embeddings.
+4. Expand the dataset with more complexes.
+5. Prepare final presentation/deck.

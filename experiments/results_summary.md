@@ -78,6 +78,32 @@ Input dimension:
 43
 ```
 
+### Physicochemical Representation
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  hydrophobicity_A,
+  hydrophobicity_B,
+  charge_A,
+  charge_B,
+  polarity_A,
+  polarity_B,
+  aromaticity_A,
+  aromaticity_B
+]
+```
+
+This adds compact biological residue properties for both residues in the correspondence pair.
+
+Input dimension:
+
+```text
+11
+```
+
 ---
 
 ## 4. Processed Protein Complexes
@@ -454,15 +480,6 @@ The goal was to test whether amino acid identity improves interface/contact pred
 | GCN | 43 | 11 | 0.40 | 0.1909 | 0.3443 | 0.2456 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
 | GAT | 43 | 34 | 0.40 | 0.1279 | 0.6885 | 0.2157 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 
-### Comparison with Basic 3-Feature Representation
-
-| Feature Set | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|------------|-------|------------------|---------------|-----------|---------------|
-| Basic 3 features | GCN | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| Basic 3 features | GAT | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
-| Amino acid one-hot, 43 features | GCN | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
-| Amino acid one-hot, 43 features | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
-
 ### Interpretation
 
 Adding amino acid one-hot features changed the behavior of both models.
@@ -487,7 +504,76 @@ The amino acid one-hot experiment is still useful because it shows that biologic
 
 ---
 
-## 14. Current Best Scientifically Reliable Result
+## 14. Physicochemical Feature Experiment
+
+To test a compact biological feature representation, residue-level physicochemical properties were added.
+
+The feature vector is:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  hydrophobicity_A,
+  hydrophobicity_B,
+  charge_A,
+  charge_B,
+  polarity_A,
+  polarity_B,
+  aromaticity_A,
+  aromaticity_B
+]
+```
+
+This increases the input feature dimension from:
+
+```text
+3 → 11
+```
+
+The goal was to test whether compact biological features generalize better than sparse amino acid one-hot encodings.
+
+### Train/Validation/Test Results with Physicochemical Features
+
+| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
+| GCN | 11 | 24 | 0.60 | 0.2804 | 0.2459 | 0.2620 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
+| GAT | 11 | 22 | 0.50 | 0.1548 | 0.6066 | 0.2467 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+
+### Interpretation
+
+Compared with amino acid one-hot features, physicochemical features improved GAT positive-class F1-score:
+
+```text
+GAT one-hot F1:          0.1836
+GAT physicochemical F1:  0.2037
+```
+
+However, physicochemical features still did not outperform the basic 3-feature representation:
+
+```text
+GAT basic 3-feature F1:  0.2361
+```
+
+This suggests that compact biological residue properties are more stable than one-hot amino acid identity in this setup, but the current dataset still generalizes best with simple geometric/topological features.
+
+---
+
+## 15. Feature Set Comparison
+
+| Feature Set | Input Dim | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-----------|-------|------------------|---------------|-----------|---------------|
+| Basic 3 features | 3 | GCN | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | 3 | GAT | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot | 43 | GCN | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot | 43 | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+| Physicochemical | 11 | GCN | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
+| Physicochemical | 11 | GAT | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+
+---
+
+## 16. Current Best Scientifically Reliable Result
 
 The most reliable setting is the train/validation/test split with validation-based early stopping.
 
@@ -497,6 +583,8 @@ The most reliable setting is the train/validation/test split with validation-bas
 | Basic 3 features | GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 | Amino acid one-hot, 43 features | GCN | 11 | 0.40 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
 | Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+| Physicochemical, 11 features | GCN | 24 | 0.60 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
+| Physicochemical, 11 features | GAT | 22 | 0.50 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
 
 Current best model under the strict train/validation/test protocol:
 
@@ -512,7 +600,7 @@ Best strict positive-class F1-score:
 
 ---
 
-## 15. Current Conclusion
+## 17. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
@@ -521,25 +609,21 @@ Best strict positive-class F1-score:
 - GAT detects more positive interface/contact nodes.
 - In the strict train/validation/test setup, GAT outperforms GCN on positive-class F1-score when using the basic 3-feature representation.
 - Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
-- Under the current dataset and model settings, the basic 3-feature representation generalizes better in terms of positive-class F1-score.
-- The amino acid one-hot experiment is still valuable because it demonstrates that biological residue identity affects model behavior.
+- Physicochemical features are more compact and improve over one-hot features for GAT, but still do not outperform the basic 3-feature representation.
+- Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
+- Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
 
 ---
 
-## 16. Next Experiments
+## 18. Next Experiments
 
 Potential next steps:
 
-1. Add physicochemical residue features:
-   - hydrophobicity
-   - charge
-   - polarity
-   - aromaticity
-2. Add accessible surface area if feasible.
-3. Visualize GAT attention weights.
-4. Compare different GAT head counts and hidden dimensions.
-5. Analyze false positives and false negatives.
-6. Add plots for:
+1. Add accessible surface area if feasible.
+2. Visualize GAT attention weights.
+3. Compare different GAT head counts and hidden dimensions.
+4. Analyze false positives and false negatives.
+5. Add plots for:
    - class imbalance
    - precision vs recall
    - F1-score comparison
@@ -547,4 +631,4 @@ Potential next steps:
    - threshold tuning results
    - early stopping results
    - feature engineering comparison
-7. Prepare final report and presentation.
+6. Prepare final report and presentation.

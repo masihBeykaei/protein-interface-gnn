@@ -20,6 +20,7 @@ Implemented so far:
 - Candidate filtering to reduce graph size
 - Basic node feature engineering
 - Amino acid one-hot feature engineering
+- Physicochemical residue feature engineering
 - Single-graph GCN and GAT experiments on 1BRS
 - DBD-style multi-chain complex support
 - Multi-protein dataset generation from several protein complexes
@@ -27,7 +28,10 @@ Implemented so far:
 - Negative sampling ratio tuning
 - Probability threshold tuning
 - Train/validation/test split with validation-based early stopping
-- Comparison between basic 3-feature representation and 43-dimensional amino acid one-hot representation
+- Comparison between:
+  - basic 3-feature representation
+  - 43-dimensional amino acid one-hot representation
+  - 11-dimensional physicochemical representation
 
 ---
 
@@ -83,7 +87,7 @@ Input dimension:
 
 A biological feature engineering experiment was added by encoding amino acid identity.
 
-New feature vector:
+Feature vector:
 
 ```text
 [CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
@@ -96,6 +100,36 @@ Input dimension:
 ```
 
 This experiment tests whether residue identity helps the model detect protein–protein interface/contact pairs.
+
+### Physicochemical Feature Vector
+
+A compact biological feature representation was also tested.
+
+Feature vector:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  hydrophobicity_A,
+  hydrophobicity_B,
+  charge_A,
+  charge_B,
+  polarity_A,
+  polarity_B,
+  aromaticity_A,
+  aromaticity_B
+]
+```
+
+Input dimension:
+
+```text
+11
+```
+
+This representation aims to provide biologically meaningful residue information without using a high-dimensional sparse one-hot encoding.
 
 ---
 
@@ -332,6 +366,65 @@ The amino acid one-hot experiment is kept as a feature engineering experiment be
 
 ---
 
+## 🧪 Physicochemical Feature Experiment
+
+A compact biological feature representation was added using residue-level physicochemical properties.
+
+Feature vector:
+
+```text
+[
+  CA_distance,
+  degree_partner_1,
+  degree_partner_2,
+  hydrophobicity_A,
+  hydrophobicity_B,
+  charge_A,
+  charge_B,
+  polarity_A,
+  polarity_B,
+  aromaticity_A,
+  aromaticity_B
+]
+```
+
+This gives an input dimension of:
+
+```text
+11
+```
+
+### Strict Train/Validation/Test Results
+
+| Feature Set | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
+|------------|-------|------------------|---------------|-----------|---------------|
+| Basic 3 features | GCN | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
+| Basic 3 features | GAT | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+| Amino acid one-hot, 43 features | GCN | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
+| Amino acid one-hot, 43 features | GAT | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+| Physicochemical, 11 features | GCN | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
+| Physicochemical, 11 features | GAT | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
+
+### Interpretation
+
+Physicochemical features improved GAT compared with amino acid one-hot features in terms of positive-class F1-score:
+
+```text
+GAT one-hot F1:          0.1836
+GAT physicochemical F1:  0.2037
+```
+
+However, the best strict result is still achieved by the GAT model using the basic 3-feature representation:
+
+```text
+GAT, basic 3 features
+Test F1 1 = 0.2361
+```
+
+This suggests that compact biological features are more stable than sparse one-hot features in this setup, but the current dataset still generalizes best with simple geometric/topological features.
+
+---
+
 ## ⚖️ Handling Class Imbalance
 
 Protein–protein interface prediction is naturally imbalanced because only a small fraction of residue pairs are true interface/contact pairs.
@@ -435,6 +528,8 @@ The most reliable result currently comes from the train/validation/test experime
 | Basic 3 features | GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 | Amino acid one-hot, 43 features | GCN | 11 | 0.40 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
 | Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
+| Physicochemical, 11 features | GCN | 24 | 0.60 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
+| Physicochemical, 11 features | GAT | 22 | 0.50 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
 
 Current best model under the strict protocol:
 
@@ -485,6 +580,20 @@ python preprocessing/build_multi_protein_dataset.py
 ```
 
 This generates correspondence graph labels, node features, residue pairs, and edge indices for all configured complexes.
+
+The current preprocessing script supports feature modes:
+
+```text
+basic
+aa_onehot
+physicochemical
+```
+
+The feature mode can be changed in:
+
+```text
+preprocessing/build_multi_protein_dataset.py
+```
 
 ### 2. Train single-graph GCN baseline
 
@@ -569,7 +678,9 @@ protein-interface-gnn/
 │   ├── early_stopping_results.md
 │   ├── early_stopping_results.csv
 │   ├── early_stopping_results_aa_onehot.md
-│   └── early_stopping_results_aa_onehot.csv
+│   ├── early_stopping_results_aa_onehot.csv
+│   ├── early_stopping_results_physicochemical.md
+│   └── early_stopping_results_physicochemical.csv
 │
 ├── utils/
 │
@@ -588,18 +699,14 @@ Current results show different behaviors between feature sets and models:
 - GAT detects more true positive interface/contact nodes.
 - In the strict train/validation/test setup, GAT with the basic 3-feature representation achieves the best positive-class F1-score.
 - Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
-- Under the current dataset and model settings, the simpler 3-feature representation generalizes better in terms of positive-class F1-score.
-- The amino acid one-hot experiment is still useful because it shows that biological residue identity affects model behavior.
+- Physicochemical features are more compact and perform better than one-hot features for GAT, but still do not outperform the basic 3-feature representation.
+- Under the current dataset and model settings, simple geometric/topological features generalize best in terms of positive-class F1-score.
+- Biological features are still valuable because they reveal useful recall-oriented behavior and provide a foundation for future feature engineering.
 
 ---
 
 ## 🔜 Next Steps
 
-- Add physicochemical residue features:
-  - hydrophobicity
-  - charge
-  - polarity
-  - aromaticity
 - Add accessible surface area if feasible.
 - Visualize GAT attention weights.
 - Tune GAT hidden dimensions and attention heads.

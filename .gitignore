@@ -23,3 +23,7 @@ Thumbs.db
 
 data/processed/
 data/raw_pdb/
+
+# Large generated attention files
+experiments/gat_attention_weights.csv
+experiments/*attention_weights*.csv

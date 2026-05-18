@@ -1,0 +1,13 @@
+case_name,pdb_id,pdb_file,partner1_chains,partner2_chains,source,split,status,reason,residues_A,residues_B,graph_A_edges,graph_B_edges,keep_A,keep_B,candidate_nodes,positive,negative,positive_ratio
+1BRS_A_B,1BRS,data\raw_pdb\1BRS.pdb,A,B,current,test,reject,positive<30,108,110,978,990,15,15,225,16,209,0.07111111111111111
+1FSS_A_B,1FSS,data\raw_pdb\1FSS.pdb,A,B,current,test,accept,passed,532,61,5572,586,61,33,2013,63,1950,0.03129657228017884
+1AHW_AB_C,1AHW,data\raw_pdb\1AHW.pdb,AB,C,current,train,accept,passed,428,200,4316,1886,51,42,2142,73,2069,0.034080298786181136
+1DQJ_AB_C,1DQJ,data\raw_pdb\1DQJ.pdb,AB,C,current,val,accept,passed,424,129,4208,1256,46,43,1978,71,1907,0.0358948432760364
+1E6J_HL_P,1E6J,data\raw_pdb\1E6J.pdb,HL,P,current,val,accept,passed,429,210,4158,1736,39,29,1131,51,1080,0.04509283819628647
+1JPS_HL_T,1JPS,data\raw_pdb\1JPS.pdb,HL,T,current,train,accept,passed,426,200,4306,1872,52,42,2184,71,2113,0.03250915750915751
+1MLC_AB_E,1MLC,data\raw_pdb\1MLC.pdb,AB,E,current,train,accept,passed,432,129,4258,1290,44,35,1540,54,1486,0.03506493506493506
+1WEJ_HL_F,1WEJ,data\raw_pdb\1WEJ.pdb,HL,F,current,train,accept,passed,437,104,4394,998,38,27,1026,41,985,0.03996101364522417
+2FD6_HL_U,2FD6,data\raw_pdb\2FD6.pdb,HL,U,current,train,accept,passed,426,249,4256,2576,37,31,1147,47,1100,0.04097646033129904
+2VIS_AB_C,2VIS,data\raw_pdb\2VIS.pdb,AB,C,current,train,accept,passed,431,267,4344,2700,36,48,1728,51,1677,0.029513888888888888
+3HMX_LH_AB,3HMX,data\raw_pdb\3HMX.pdb,LH,AB,current,test,accept,passed,431,471,4234,4222,55,42,2310,72,2238,0.03116883116883117
+3MJ9_HL_A,3MJ9,data\raw_pdb\3MJ9.pdb,HL,A,current,train,accept,passed,419,229,4196,2204,67,49,3283,88,3195,0.026804751751446847

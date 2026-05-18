@@ -1,0 +1,12 @@
+case_name,pdb_id,pdb_file,partner1_chains,partner2_chains,source,split,enabled
+1FSS_A_B,1FSS,data\raw_pdb\1FSS.pdb,A,B,current,test,1
+1AHW_AB_C,1AHW,data\raw_pdb\1AHW.pdb,AB,C,current,train,1
+1DQJ_AB_C,1DQJ,data\raw_pdb\1DQJ.pdb,AB,C,current,val,1
+1E6J_HL_P,1E6J,data\raw_pdb\1E6J.pdb,HL,P,current,val,1
+1JPS_HL_T,1JPS,data\raw_pdb\1JPS.pdb,HL,T,current,train,1
+1MLC_AB_E,1MLC,data\raw_pdb\1MLC.pdb,AB,E,current,train,1
+1WEJ_HL_F,1WEJ,data\raw_pdb\1WEJ.pdb,HL,F,current,train,1
+2FD6_HL_U,2FD6,data\raw_pdb\2FD6.pdb,HL,U,current,train,1
+2VIS_AB_C,2VIS,data\raw_pdb\2VIS.pdb,AB,C,current,train,1
+3HMX_LH_AB,3HMX,data\raw_pdb\3HMX.pdb,LH,AB,current,test,1
+3MJ9_HL_A,3MJ9,data\raw_pdb\3MJ9.pdb,HL,A,current,train,1

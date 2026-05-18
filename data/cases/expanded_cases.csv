@@ -1,0 +1,13 @@
+case_name,pdb_id,pdb_file,partner1_chains,partner2_chains,source,split,enabled
+1BRS_A_B,1BRS,,A,B,current,test,1
+1FSS_A_B,1FSS,,A,B,current,test,1
+1AHW_AB_C,1AHW,,AB,C,current,train,1
+1DQJ_AB_C,1DQJ,,AB,C,current,val,1
+1E6J_HL_P,1E6J,,HL,P,current,val,1
+1JPS_HL_T,1JPS,,HL,T,current,train,1
+1MLC_AB_E,1MLC,,AB,E,current,train,1
+1WEJ_HL_F,1WEJ,,HL,F,current,train,1
+2FD6_HL_U,2FD6,,HL,U,current,train,1
+2VIS_AB_C,2VIS,,AB,C,current,train,1
+3HMX_LH_AB,3HMX,,LH,AB,current,test,1
+3MJ9_HL_A,3MJ9,,HL,A,current,train,1

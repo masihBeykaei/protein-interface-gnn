@@ -33,3 +33,19 @@ data/processed_expanded/
 
 data/raw_pdb_expanded/
 data/processed_expanded/
+
+data/raw_pdb_expanded_bm5/
+data/processed_bm5_train_balanced_natural_test/
+data/processed_hard_negative_train_natural_test_r5/
+data/processed_hard_negative_train_natural_test_r10/
+data/processed_train_balanced_natural_test/
+
+data/raw_pdb_expanded_bm5/
+data/processed_bm5_train_balanced_natural_test/
+
+data/raw_pdb_expanded_bm5/
+data/processed_bm5_train_balanced_natural_test/
+data/processed_combined_current_bm5_train_balanced_natural_test/
+data/processed_hard_negative_train_natural_test_r5/
+data/processed_hard_negative_train_natural_test_r10/
+data/processed_train_balanced_natural_test/

@@ -8,8 +8,7 @@ This document summarizes the current experimental results for protein–protein 
 
 The goal of this project is to predict protein–protein interface/contact residue pairs using graph-based learning.
 
-Each protein partner is represented as a residue-level graph.  
-A correspondence graph is then built between two interacting partners, where each correspondence node represents a possible residue pair.
+Each protein partner is represented as a residue-level graph. A correspondence graph is then built between two interacting partners, where each correspondence node represents a possible residue pair.
 
 The final task is a node-level binary classification problem:
 
@@ -116,8 +115,6 @@ Input dimension:
 
 ## 4. Processed Protein Complexes
 
-The current multi-protein dataset includes original examples and DBD-style protein complexes.
-
 | Case | Nodes | Positive | Negative | Positive Ratio | Edges |
 |------|-------|----------|----------|----------------|-------|
 | 1BRS_A_B | 225 | 16 | 209 | 0.0711 | 13,448 |
@@ -143,35 +140,9 @@ The dataset is highly imbalanced, which is expected in protein–protein interfa
 
 ---
 
-## 5. Initial Graph-Level Train/Test Split
+## 5. Class Imbalance Handling
 
-The initial multi-graph experiments used a graph-level train/test split.
-
-### Train Graphs
-
-- 1WEJ_HL_F
-- 1JPS_HL_T
-- 1AHW_AB_C
-- 2FD6_HL_U
-- 2VIS_AB_C
-- 1MLC_AB_E
-- 3MJ9_HL_A
-- 1DQJ_AB_C
-- 1E6J_HL_P
-
-### Test Graphs
-
-- 1BRS_A_B
-- 1FSS_A_B
-- 3HMX_LH_AB
-
----
-
-## 6. Class Imbalance Handling
-
-Protein–protein interface prediction is naturally imbalanced because only a small fraction of residue pairs are true interface/contact pairs.
-
-To handle this, multi-graph training uses a balanced loss mask.
+Multi-graph training uses a balanced loss mask.
 
 For each training batch:
 
@@ -185,9 +156,15 @@ The loss is computed using:
 all positive nodes + NEGATIVE_RATIO × positive_count negative nodes
 ```
 
+Default setting:
+
+```text
+NEGATIVE_RATIO = 5
+```
+
 ---
 
-## 7. Initial Multi-Graph GCN Results
+## 6. Initial Multi-Graph GCN Results
 
 Script:
 
@@ -231,7 +208,7 @@ Accuracy:
 
 ---
 
-## 8. Initial Multi-Graph GAT Results
+## 7. Initial Multi-Graph GAT Results
 
 Script:
 
@@ -275,34 +252,24 @@ Accuracy:
 
 ---
 
-## 9. Initial Model Comparison on Test Set
+## 8. Initial Model Comparison
 
 | Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
 |-------|-------------|----------|------------|----------|
 | Multi-Graph GCN | 0.2068 | 0.3245 | 0.2526 | 0.9362 |
 | Multi-Graph GAT | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 
-### Interpretation
-
-The GCN model is more conservative. It predicts fewer positive nodes, which leads to higher precision and a slightly better positive-class F1-score.
-
-The GAT model is more sensitive to interface/contact nodes. It achieves much higher recall for the positive class, meaning it detects more true interface residue pairs. However, this comes at the cost of more false positives and lower precision.
+GCN is more conservative. GAT is more sensitive and achieves much higher positive-class recall.
 
 ---
 
-## 10. Negative Ratio Tuning Experiment
+## 9. Negative Ratio Tuning
 
 Script:
 
 ```text
 experiments/tune_negative_ratio.py
 ```
-
-This experiment compares GCN and GAT under different negative sampling ratios.
-
-Results were generated using the basic 3-feature representation.
-
-### Test Set Results
 
 | Model | Negative Ratio | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|----------------|------------------|---------------|-----------|---------------|
@@ -315,7 +282,7 @@ Results were generated using the basic 3-feature representation.
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 | GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
-### Best Settings by Positive-Class F1
+Best by positive-class F1:
 
 | Model | Best Negative Ratio | Precision 1 | Recall 1 | F1 1 |
 |-------|---------------------|-------------|----------|------|
@@ -324,7 +291,7 @@ Results were generated using the basic 3-feature representation.
 
 ---
 
-## 11. Probability Threshold Tuning Experiment
+## 10. Probability Threshold Tuning
 
 Script:
 
@@ -338,28 +305,24 @@ A node is predicted as positive if:
 P(class 1) >= threshold
 ```
 
-Results were generated using the basic 3-feature representation.
-
-### Best Thresholds by Positive-Class F1
+Best threshold results:
 
 | Model | Best Threshold | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |-------|----------------|-------------|----------|------|----------|
 | GCN | 0.40 | 0.1762 | 0.4702 | 0.2563 | 0.9094 |
 | GAT | 0.60 | 0.1434 | 0.4967 | 0.2226 | 0.8848 |
 
-Threshold tuning shows that probability calibration can slightly improve both models, especially when the dataset is highly imbalanced.
+This experiment is exploratory because threshold tuning was performed on the test set. The stricter validation-based protocol is preferred.
 
 ---
 
-## 12. Train/Validation/Test Early Stopping Experiment
+## 11. Strict Train/Validation/Test Early Stopping Experiment
 
 Script:
 
 ```text
 experiments/train_val_test_early_stopping.py
 ```
-
-This experiment uses a graph-level train/validation/test split.
 
 The validation set is used for:
 
@@ -391,26 +354,20 @@ The test set is used only for final evaluation.
 - 1FSS_A_B
 - 3HMX_LH_AB
 
-### Basic 3-Feature Results
+---
+
+## 12. Basic 3-Feature Results
 
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
 | GCN | 3 | 7 | 0.50 | 0.3434 | 0.2787 | 0.3077 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
 | GAT | 3 | 56 | 0.50 | 0.1589 | 0.6721 | 0.2571 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 
-### Interpretation
-
-This is the most scientifically reliable experiment for the basic feature representation because the test set is not used for threshold selection or early stopping.
+This is the most scientifically reliable experiment for the basic representation.
 
 ---
 
 ## 13. Amino Acid One-Hot Feature Experiment
-
-The amino acid one-hot feature vector is:
-
-```text
-[CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
-```
 
 Input dimension:
 
@@ -418,38 +375,16 @@ Input dimension:
 43
 ```
 
-### Train/Validation/Test Results
-
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
 | GCN | 43 | 11 | 0.40 | 0.1909 | 0.3443 | 0.2456 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
 | GAT | 43 | 34 | 0.40 | 0.1279 | 0.6885 | 0.2157 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
 
-### Interpretation
-
-Adding amino acid one-hot features increased recall, especially for GAT, but also increased false positives.
+Amino acid identity increased recall but also increased false positives.
 
 ---
 
 ## 14. Physicochemical Feature Experiment
-
-The physicochemical feature vector is:
-
-```text
-[
-  CA_distance,
-  degree_partner_1,
-  degree_partner_2,
-  hydrophobicity_A,
-  hydrophobicity_B,
-  charge_A,
-  charge_B,
-  polarity_A,
-  polarity_B,
-  aromaticity_A,
-  aromaticity_B
-]
-```
 
 Input dimension:
 
@@ -457,24 +392,24 @@ Input dimension:
 11
 ```
 
-### Train/Validation/Test Results
-
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
 | GCN | 11 | 24 | 0.60 | 0.2804 | 0.2459 | 0.2620 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
 | GAT | 11 | 22 | 0.50 | 0.1548 | 0.6066 | 0.2467 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
 
-### Interpretation
-
-Compared with amino acid one-hot features, physicochemical features improved GAT positive-class F1-score, but still did not outperform the basic 3-feature representation.
+Physicochemical features improved over one-hot for GAT, but did not beat the basic GAT result.
 
 ---
 
 ## 15. Accessible Surface Area Feature Experiment
 
-Accessible surface area was added as a structural residue-level feature.
+Input dimension:
 
-The feature vector is:
+```text
+5
+```
+
+Feature vector:
 
 ```text
 [
@@ -486,24 +421,12 @@ The feature vector is:
 ]
 ```
 
-Input dimension:
-
-```text
-5
-```
-
-### Train/Validation/Test Results
-
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
 | GCN | 5 | 35 | 0.60 | 0.2251 | 0.5000 | 0.3104 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
 | GAT | 5 | 191 | 0.50 | 0.3050 | 0.3525 | 0.3270 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
-### Interpretation
-
-ASA features improved GCN substantially compared with the basic 3-feature GCN.
-
-For GAT, ASA increased precision but reduced recall. The final F1-score is very close to the best basic GAT result, but slightly lower.
+ASA improved GCN substantially. For GAT, ASA increased precision but reduced recall. Its F1-score is very close to the best basic GAT result.
 
 ---
 
@@ -530,14 +453,6 @@ Script:
 experiments/tune_gat_hyperparameters.py
 ```
 
-The experiment tuned:
-
-- hidden channels
-- number of attention heads
-- dropout
-
-### Results
-
 | Hidden | Heads | Dropout | Val F1 1 | Test F1 1 |
 |--------|-------|---------|----------|-----------|
 | 16 | 4 | 0.2 | 0.2571 | 0.2361 |
@@ -546,7 +461,7 @@ The experiment tuned:
 | 32 | 8 | 0.2 | 0.2457 | 0.1899 |
 | 16 | 4 | 0.3 | 0.2534 | 0.2118 |
 
-The best configuration remains:
+Best configuration:
 
 ```text
 hidden_channels = 16
@@ -554,11 +469,182 @@ heads = 4
 dropout = 0.2
 ```
 
-This suggests that larger GAT models do not improve generalization on the current dataset.
+Larger GAT models did not improve generalization.
 
 ---
 
-## 18. Experiment Figures
+## 18. Error Analysis
+
+Error analysis was performed for the current best strict model:
+
+```text
+GAT + basic 3 features
+```
+
+Script:
+
+```text
+experiments/analyze_errors.py
+```
+
+### Test Metrics
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Confusion Matrix
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 4137 | 260 |
+| True 1 | 96 | 55 |
+
+### Per-Test-Graph Error Summary
+
+| Case | Nodes | Positive | Negative | TP | TN | FP | FN |
+|------|-------|----------|----------|----|----|----|----|
+| 1BRS_A_B | 225 | 16 | 209 | 11 | 139 | 70 | 5 |
+| 1FSS_A_B | 2,013 | 63 | 1,950 | 19 | 1,862 | 88 | 44 |
+| 3HMX_LH_AB | 2,310 | 72 | 2,238 | 25 | 2,136 | 102 | 47 |
+
+The model produces more false positives than false negatives:
+
+```text
+False positives: 260
+False negatives: 96
+```
+
+This suggests the model is sensitive but not highly precise.
+
+---
+
+## 19. GAT Attention Analysis
+
+Attention weights were extracted from the first GATConv layer of the best strict GAT model.
+
+Scripts:
+
+```text
+experiments/visualize_gat_attention.py
+experiments/refine_gat_attention_analysis.py
+```
+
+Output files:
+
+```text
+experiments/gat_attention_summary.md
+experiments/gat_attention_refined_summary.md
+experiments/gat_attention_top_edges.csv
+experiments/gat_attention_top_non_self_edges.csv
+experiments/gat_attention_top_predicted_positive_edges.csv
+experiments/gat_attention_top_tp_context_edges.csv
+experiments/gat_attention_top_fp_context_edges.csv
+experiments/gat_attention_top_fn_context_edges.csv
+experiments/gat_attention_error_context_edges.csv
+```
+
+The full table is intentionally not committed:
+
+```text
+experiments/gat_attention_weights.csv
+```
+
+### Interpretation
+
+Raw top attention edges were dominated by self-loops. The refined attention analysis separates attention edges by prediction context:
+
+- non-self edges
+- predicted-positive context
+- true-positive context
+- false-positive context
+- false-negative context
+- FP/FN error context
+
+GAT attention should be interpreted as local message-passing importance rather than direct biological importance.
+
+---
+
+## 20. Structural 3D Error Visualization
+
+Structural visualization files were generated for the best strict model:
+
+```text
+GAT + basic 3 features
+```
+
+Script:
+
+```text
+experiments/generate_structural_error_visualization.py
+```
+
+Output directory:
+
+```text
+experiments/structural_error_visualization/
+```
+
+Generated files:
+
+```text
+1BRS_A_B_structural_errors.pml
+1FSS_A_B_structural_errors.pml
+3HMX_LH_AB_structural_errors.pml
+structural_error_visualization_pairs.csv
+structural_error_visualization_summary.md
+```
+
+### Test Metrics Used for Visualization
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
+
+### Confusion Matrix
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 4137 | 260 |
+| True 1 | 96 | 55 |
+
+### Available Error Counts
+
+| Case | TP | FP | FN |
+|------|----|----|----|
+| 1BRS_A_B | 11 | 70 | 5 |
+| 1FSS_A_B | 19 | 88 | 44 |
+| 3HMX_LH_AB | 25 | 102 | 47 |
+
+### Selected Residue Pairs for Visualization
+
+Top `10` pairs per class were selected when available.
+
+| Case | TP Selected | FP Selected | FN Selected |
+|------|-------------|-------------|-------------|
+| 1BRS_A_B | 10 | 10 | 5 |
+| 1FSS_A_B | 10 | 10 | 10 |
+| 3HMX_LH_AB | 10 | 10 | 10 |
+
+### PyMOL Color Legend
+
+| Color | Meaning |
+|-------|---------|
+| Green | True Positive residue pairs |
+| Red | False Positive residue pairs |
+| Orange | False Negative residue pairs |
+
+Example:
+
+```bash
+pymol experiments/structural_error_visualization/1BRS_A_B_structural_errors.pml
+```
+
+This step connects numerical error analysis with qualitative 3D structural inspection.
+
+---
+
+## 21. Experiment Figures
 
 Generated plots are stored in:
 
@@ -583,115 +669,7 @@ Figures include:
 
 ---
 
-## 19. Error Analysis
-
-Error analysis was performed for the current best strict protocol model:
-
-```text
-Model: GAT
-Features: basic 3 features
-Input dimension: 3
-Split: train/validation/test
-Threshold selected on validation set
-```
-
-Script:
-
-```text
-experiments/analyze_errors.py
-```
-
-### Training Selection
-
-| Best Epoch | Best Threshold | Best Validation F1 1 |
-|------------|----------------|----------------------|
-| 56 | 0.50 | 0.2571 |
-
-### Test Metrics
-
-| Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------------|----------|------|----------|
-| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
-
-### Confusion Matrix on Test Set
-
-| True / Pred | Pred 0 | Pred 1 |
-|-------------|--------|--------|
-| True 0 | 4137 | 260 |
-| True 1 | 96 | 55 |
-
-### Per-Test-Graph Error Summary
-
-| Case | Nodes | Positive | Negative | TP | TN | FP | FN |
-|------|-------|----------|----------|----|----|----|----|
-| 1BRS_A_B | 225 | 16 | 209 | 11 | 139 | 70 | 5 |
-| 1FSS_A_B | 2,013 | 63 | 1,950 | 19 | 1,862 | 88 | 44 |
-| 3HMX_LH_AB | 2,310 | 72 | 2,238 | 25 | 2,136 | 102 | 47 |
-
-### Error Analysis Interpretation
-
-The model produces more false positives than false negatives:
-
-```text
-False positives: 260
-False negatives: 96
-```
-
-This suggests that the best GAT model is sensitive to potential interface/contact patterns, but it is not yet highly precise.
-
----
-
-## 20. GAT Attention Analysis
-
-Attention weights were extracted from the first GATConv layer of the best strict GAT model.
-
-Scripts:
-
-```text
-experiments/visualize_gat_attention.py
-experiments/refine_gat_attention_analysis.py
-```
-
-### Attention Output Files
-
-```text
-experiments/gat_attention_summary.md
-experiments/gat_attention_refined_summary.md
-experiments/gat_attention_top_edges.csv
-experiments/gat_attention_top_non_self_edges.csv
-experiments/gat_attention_top_predicted_positive_edges.csv
-experiments/gat_attention_top_tp_context_edges.csv
-experiments/gat_attention_top_fp_context_edges.csv
-experiments/gat_attention_top_fn_context_edges.csv
-experiments/gat_attention_error_context_edges.csv
-```
-
-The full attention table is intentionally not committed because it is large:
-
-```text
-experiments/gat_attention_weights.csv
-```
-
-### Interpretation
-
-Raw top attention edges were dominated by self-loops. The refined attention analysis removes self-loop dominance and separates attention edges by prediction context.
-
-Attention subsets include:
-
-- non-self edges
-- predicted-positive context
-- true-positive context
-- false-positive context
-- false-negative context
-- FP/FN error context
-
-GAT attention weights are locally normalized, so they should be interpreted as local message-passing importance rather than global biological importance.
-
----
-
-## 21. Current Best Scientifically Reliable Result
-
-The most reliable setting is the train/validation/test split with validation-based early stopping.
+## 22. Current Best Scientifically Reliable Result
 
 | Feature Set | Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |------------|-------|------------|-----------|------------------|---------------|-----------|---------------|
@@ -704,7 +682,7 @@ The most reliable setting is the train/validation/test split with validation-bas
 | Basic + ASA, 5 features | GCN | 35 | 0.60 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
 | Basic + ASA, 5 features | GAT | 191 | 0.50 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
 
-Current best model under the strict train/validation/test protocol:
+Current best model:
 
 ```text
 GAT with basic 3-feature representation
@@ -716,38 +694,38 @@ Best strict positive-class F1-score:
 0.2361
 ```
 
-The Basic + ASA GAT model is very close:
+Closest alternative:
 
 ```text
+GAT with basic + ASA features
 Test F1 1 = 0.2338
 ```
 
 ---
 
-## 22. Current Conclusion
+## 23. Current Conclusion
 
 - Multi-graph training works successfully.
 - Adding DBD-style complexes increased the number of positive samples to 698.
-- The dataset is still imbalanced, but it is large enough for meaningful multi-graph experiments.
+- The dataset is still highly imbalanced.
 - GCN is conservative and often achieves higher accuracy.
 - GAT detects more positive interface/contact nodes.
-- In the strict train/validation/test setup, GAT outperforms GCN on positive-class F1-score when using the basic 3-feature representation.
-- Amino acid one-hot features increase recall, especially for GAT, but also increase false positives.
-- Physicochemical features are more compact and improve over one-hot features for GAT, but still do not outperform the basic 3-feature representation.
-- ASA features substantially improve GCN and produce a more precision-oriented GAT.
-- The best overall strict F1 remains GAT with basic 3 features.
-- Larger GAT models did not improve generalization.
-- Attention analysis is useful for local explanation, but raw attention is not a direct biological importance score.
-- Error analysis shows that the best GAT model produces more false positives than false negatives.
+- In the strict setup, GAT with basic 3 features has the best positive-class F1-score.
+- Amino acid one-hot features increase recall but also increase false positives.
+- Physicochemical features are more compact and better than one-hot for GAT, but still below basic GAT.
+- ASA features improve GCN and produce a more precision-oriented GAT.
+- GAT hyperparameter tuning confirmed that the current baseline configuration is best.
+- Error analysis shows that false positives are the main issue.
+- Attention analysis provides local message-passing interpretation.
+- Structural visualization files allow TP/FP/FN residue pairs to be inspected in 3D.
 
 ---
 
-## 23. Remaining Next Experiments
+## 24. Remaining Next Experiments
 
 Potential next steps:
 
-1. Analyze false positives and false negatives in 3D structural context.
-2. Add structural visualization of predicted interface pairs.
-3. Add protein language model embeddings.
-4. Expand the dataset with more complexes.
-5. Prepare final presentation/deck.
+1. Try protein language model embeddings.
+2. Expand the dataset with more complexes.
+3. Prepare a final presentation/deck.
+4. Optionally inspect generated PyMOL visualizations manually.

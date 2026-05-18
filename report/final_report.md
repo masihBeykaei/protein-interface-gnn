@@ -8,7 +8,7 @@ In this project, the goal is to predict residue-level protein–protein interfac
 
 The project implements and evaluates Graph Neural Network models, specifically Graph Convolutional Networks (GCN) and Graph Attention Networks (GAT), under a multi-protein experimental setting.
 
-The project also includes feature engineering, class imbalance handling, hyperparameter tuning, visualization, GAT attention analysis, and error analysis.
+The project also includes feature engineering, class imbalance handling, hyperparameter tuning, visualization, GAT attention analysis, numerical error analysis, and structural 3D error visualization.
 
 ---
 
@@ -41,7 +41,9 @@ This project is inspired by the paper:
 Graph Neural Networks for the Prediction of Protein–Protein Interfaces
 ```
 
-The core idea is to model proteins as graphs and use graph neural networks to learn interaction patterns. In this project, the original idea is implemented in a simplified and reproducible way using:
+The core idea is to model proteins as graphs and use graph neural networks to learn interaction patterns.
+
+In this project, the original idea is implemented in a simplified and reproducible way using:
 
 - residue-level protein graphs
 - correspondence graphs between protein partners
@@ -51,6 +53,7 @@ The core idea is to model proteins as graphs and use graph neural networks to le
 - feature engineering experiments
 - attention analysis
 - error analysis
+- structural visualization
 
 ---
 
@@ -203,8 +206,6 @@ Four feature representations were tested.
 
 ### 9.1 Basic 3-Feature Representation
 
-The basic feature vector is:
-
 ```text
 [CA_distance, degree_partner_1, degree_partner_2]
 ```
@@ -217,10 +218,6 @@ Input dimension:
 
 ### 9.2 Amino Acid One-Hot Representation
 
-This representation adds amino acid identity for both residues.
-
-Feature vector:
-
 ```text
 [CA_distance, degree_partner_1, degree_partner_2, aa_A_onehot(20), aa_B_onehot(20)]
 ```
@@ -232,10 +229,6 @@ Input dimension:
 ```
 
 ### 9.3 Physicochemical Representation
-
-This representation adds compact biological properties for both residues.
-
-Feature vector:
 
 ```text
 [
@@ -260,10 +253,6 @@ Input dimension:
 ```
 
 ### 9.4 Basic + Accessible Surface Area Representation
-
-This representation adds residue-level accessible surface area.
-
-Feature vector:
 
 ```text
 [
@@ -411,8 +400,7 @@ Using the initial graph-level train/test split and the basic 3-feature represent
 | Multi-Graph GCN | 0.2068 | 0.3245 | 0.2526 | 0.9362 |
 | Multi-Graph GAT | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 
-The GCN model is more conservative and has higher precision.  
-The GAT model is more sensitive and achieves much higher recall.
+The GCN model is more conservative and has higher precision. The GAT model is more sensitive and achieves much higher recall.
 
 ---
 
@@ -431,8 +419,7 @@ Different negative sampling ratios were tested.
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 | GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
-For GCN, `NEGATIVE_RATIO = 5` produced the best positive-class F1-score.  
-For GAT, `NEGATIVE_RATIO = 5` also produced the best positive-class F1-score, while smaller ratios produced higher recall.
+For both models, `NEGATIVE_RATIO = 5` produced the best positive-class F1-score in this experiment.
 
 ---
 
@@ -611,8 +598,6 @@ The hardest test graph is:
 
 It has the largest number of both false positives and false negatives.
 
-This indicates that some protein complexes are more difficult to generalize to than others.
-
 ---
 
 ## 22. GAT Attention Analysis
@@ -645,7 +630,76 @@ However, GAT attention is normalized over local neighborhoods. Therefore, attent
 
 ---
 
-## 23. Visualization
+## 23. Structural 3D Error Visualization
+
+Structural visualization files were generated for the best strict model:
+
+```text
+GAT + basic 3 features
+```
+
+Script:
+
+```text
+experiments/generate_structural_error_visualization.py
+```
+
+Output directory:
+
+```text
+experiments/structural_error_visualization/
+```
+
+Generated files:
+
+```text
+1BRS_A_B_structural_errors.pml
+1FSS_A_B_structural_errors.pml
+3HMX_LH_AB_structural_errors.pml
+structural_error_visualization_pairs.csv
+structural_error_visualization_summary.md
+```
+
+### Visualization Target
+
+The visualization focuses on:
+
+- TP residue pairs
+- FP residue pairs
+- FN residue pairs
+
+Top pairs are selected as follows:
+
+- TP and FP: highest predicted probability for class 1
+- FN: lowest predicted probability for class 1
+
+### Selected Pairs
+
+| Case | TP Selected | FP Selected | FN Selected |
+|------|-------------|-------------|-------------|
+| 1BRS_A_B | 10 | 10 | 5 |
+| 1FSS_A_B | 10 | 10 | 10 |
+| 3HMX_LH_AB | 10 | 10 | 10 |
+
+### PyMOL Color Legend
+
+| Color | Meaning |
+|-------|---------|
+| Green | True Positive residue pairs |
+| Red | False Positive residue pairs |
+| Orange | False Negative residue pairs |
+
+Example command:
+
+```bash
+pymol experiments/structural_error_visualization/1BRS_A_B_structural_errors.pml
+```
+
+This step connects numerical error analysis with qualitative 3D structural inspection.
+
+---
+
+## 24. Visualization
 
 Several figures were generated for easier interpretation:
 
@@ -668,7 +722,7 @@ These plots help summarize the experimental results visually and are useful for 
 
 ---
 
-## 24. Discussion
+## 25. Discussion
 
 The experiments show that graph neural networks can learn useful patterns for protein–protein interface prediction, but the task remains challenging due to severe class imbalance and limited dataset size.
 
@@ -676,15 +730,15 @@ The GAT model generally detects more true interface pairs than GCN. However, thi
 
 Feature engineering experiments showed that adding biological residue identity or physicochemical properties changes model behavior. Amino acid one-hot features increased recall, while physicochemical features were more stable. ASA features improved GCN and made GAT more precise, but did not surpass the basic GAT F1-score.
 
-This suggests that current model performance is driven strongly by geometric proximity and graph topology. Richer biological or structural features may require larger datasets, better normalization, or more expressive models to improve generalization.
-
 GAT hyperparameter tuning showed that increasing model size did not improve performance. This suggests that the current limitation is more likely data size, class imbalance, or feature representation rather than insufficient model capacity.
 
 Attention analysis provided insight into local message-passing behavior. However, raw attention weights should not be interpreted directly as biological importance scores.
 
+Structural visualization extends error analysis by allowing selected TP, FP, and FN residue pairs to be inspected in the original 3D protein structures.
+
 ---
 
-## 25. Limitations
+## 26. Limitations
 
 Several limitations remain:
 
@@ -697,18 +751,18 @@ Several limitations remain:
 7. ASA was computed directly from the available complex structures.
 8. No pretrained protein language model embeddings were used.
 9. The model was evaluated only on selected complexes.
-10. Error analysis is not yet linked back to 3D structural visualization.
+10. Structural visualization is qualitative and requires manual inspection in PyMOL.
 11. Attention weights provide local message-passing explanations but not direct biological importance.
 
 ---
 
-## 26. Future Work
+## 27. Future Work
 
 Possible next steps include:
 
 1. Add more protein complexes.
 2. Add residue embeddings from protein language models.
-3. Analyze false positives and false negatives in 3D structure.
+3. Manually inspect structural visualizations in PyMOL.
 4. Visualize predicted interface pairs on protein structures.
 5. Compare with non-GNN baselines.
 6. Use cross-validation across protein complexes.
@@ -719,7 +773,7 @@ Possible next steps include:
 
 ---
 
-## 27. Conclusion
+## 28. Conclusion
 
 This project implemented a complete graph-based pipeline for residue-level protein–protein interface prediction.
 
@@ -737,6 +791,7 @@ The pipeline includes:
 - visualization
 - error analysis
 - GAT attention analysis
+- structural 3D error visualization
 
 The best model under the strict train/validation/test protocol is:
 
@@ -762,4 +817,4 @@ Test F1 1 = 0.2338
 
 The results show that GAT is more effective than GCN for detecting positive interface/contact residue pairs in this setup. However, false positives remain a major challenge.
 
-Overall, the project demonstrates that graph neural networks are a promising approach for protein–protein interface prediction and provides a strong foundation for future improvements using larger datasets, richer structural features, pretrained protein embeddings, and structural error visualization.
+Overall, the project demonstrates that graph neural networks are a promising approach for protein–protein interface prediction and provides a strong foundation for future improvements using larger datasets, richer structural features, pretrained protein embeddings, and structural visualization.

@@ -53,3 +53,7 @@ data/esm2_embeddings/
 data/processed_combined_current_bm5_esm2_pca64/
 data/processed_combined_current_bm5_esm2_pca32/
 data/processed_combined_current_bm5_esm2_pca16/
+data/processed_combined_current_bm5_esm2_absdiff_pca16/
+data/processed_combined_current_bm5_esm2_absdiff_pca32/
+data/processed_combined_current_bm5_esm2_product_pca16/
+data/processed_combined_current_bm5_esm2_absdiff_product_pca16/

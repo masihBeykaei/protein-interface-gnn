@@ -1,0 +1,2 @@
+best_epoch,best_threshold,best_val_f1_1,test_precision_1,test_recall_1,test_f1_1,test_accuracy,tn,fp,fn,tp
+100,0.25,0.3073446327683616,0.26,0.31451612903225806,0.2846715328467153,0.9508895013781007,7512,222,170,78

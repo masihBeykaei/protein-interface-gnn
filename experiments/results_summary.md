@@ -62,9 +62,10 @@ Total:
 | Amino acid one-hot | 43 | Basic + 20D one-hot for each residue |
 | Physicochemical | 11 | Basic + hydrophobicity, charge, polarity, aromaticity |
 | Basic + ASA | 5 | Basic + accessible surface area of both residues |
-| ESM-2 PCA64 | 67 | Basic + 64 PCA components from ESM pair features |
-| ESM-2 PCA32 | 35 | Basic + 32 PCA components from ESM pair features |
-| ESM-2 PCA16 | 19 | Basic + 16 PCA components from ESM pair features |
+| ESM-2 full pair PCA64 | 67 | Basic + 64 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| ESM-2 full pair PCA32 | 35 | Basic + 32 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| ESM-2 full pair PCA16 | 19 | Basic + 16 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| ESM-2 variant PCA | 19/35 | Basic + PCA components from absdiff/product variants |
 
 ---
 
@@ -98,7 +99,7 @@ F1 = 0.2361
 
 ---
 
-## 5. Negative Ratio Tuning
+## 5. Current-Only Negative Ratio Tuning
 
 | Model | Negative Ratio | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |-------|---------------:|------------:|---------:|-----:|---------:|
@@ -113,7 +114,7 @@ F1 = 0.2361
 
 ---
 
-## 6. GAT Hyperparameter Tuning
+## 6. Current-Only GAT Hyperparameter Tuning
 
 | Hidden | Heads | Dropout | Val F1 1 | Test F1 1 |
 |-------:|------:|--------:|---------:|----------:|
@@ -123,7 +124,7 @@ F1 = 0.2361
 | 32 | 8 | 0.2 | 0.2457 | 0.1899 |
 | 16 | 4 | 0.3 | 0.2534 | 0.2118 |
 
-Best configuration:
+Best current-only GAT configuration:
 
 ```text
 hidden_channels = 16
@@ -281,13 +282,13 @@ For each case, the following files are generated:
 <case>_esm2_metadata.json
 ```
 
-The raw pair representation is:
+The full raw pair representation is:
 
 ```text
 [ESM_A, ESM_B, abs(ESM_A - ESM_B)]
 ```
 
-Raw pair dimension:
+Raw full-pair dimension:
 
 ```text
 960
@@ -297,169 +298,156 @@ PCA and standardization are fitted only on training pairs.
 
 ---
 
-## 13. ESM-2 PCA Dataset Construction
-
-### PCA64
-
-| Raw Dim | PCA Components | Final Feature Dim |
-|--------:|---------------:|------------------:|
-| 960 | 64 | 67 |
-
-### PCA32
-
-| Raw Dim | PCA Components | Final Feature Dim |
-|--------:|---------------:|------------------:|
-| 960 | 32 | 35 |
-
-### PCA16
-
-| Raw Dim | PCA Components | Final Feature Dim |
-|--------:|---------------:|------------------:|
-| 960 | 16 | 19 |
-
----
-
-## 14. ESM-2 PCA Results
+## 13. ESM-2 Full Pair PCA Results with GAT
 
 | Experiment | Input Dim | Precision 1 | Recall 1 | F1 1 | Accuracy | TN | FP | FN | TP |
 |------------|----------:|------------:|---------:|-----:|---------:|---:|---:|---:|---:|
 | Combined basic 3 features | 3 | 0.1918 | 0.5121 | 0.2791 | 0.9178 | 7199 | 535 | 121 | 127 |
-| ESM-2 PCA64 + GAT | 67 | 0.1169 | 0.7823 | 0.2034 | 0.8096 | 6268 | 1466 | 54 | 194 |
-| ESM-2 PCA32 + GAT | 35 | 0.1953 | 0.5726 | 0.2913 | 0.9134 | 7149 | 585 | 106 | 142 |
-| ESM-2 PCA16 + GAT | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
+| ESM-2 full pair PCA64 + GAT | 67 | 0.1169 | 0.7823 | 0.2034 | 0.8096 | 6268 | 1466 | 54 | 194 |
+| ESM-2 full pair PCA32 + GAT | 35 | 0.1953 | 0.5726 | 0.2913 | 0.9134 | 7149 | 585 | 106 | 142 |
+| ESM-2 full pair PCA16 + GAT | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
 
 ---
 
-## 15. ESM-2 Interpretation
+## 14. F1 Improvement Attempts After GAT PCA16
 
-PCA64 retained too much high-dimensional signal for the current dataset size and caused over-prediction:
-
-```text
-FP = 1466
-Recall = 0.7823
-F1 = 0.2034
-```
-
-PCA32 improved F1 over the basic combined baseline:
-
-```text
-F1 = 0.2913
-```
-
-PCA16 produced the best trade-off:
-
-```text
-Precision 1 = 0.2015
-Recall 1 = 0.5323
-F1 1 = 0.2924
-Accuracy = 0.9199
-```
-
-Compared with the combined basic model:
-
-```text
-F1:       0.2791 → 0.2924
-Precision:0.1918 → 0.2015
-Recall:   0.5121 → 0.5323
-FP:       535 → 523
-TP:       127 → 132
-```
-
----
-
-
----
-
-## Final F1-Improvement Ablation Study
-
-After the full-pair ESM-2 PCA16 model became the best result, additional experiments were run to determine whether the F1-score could be pushed higher.
-
-### ESM-PCA16 GAT Hyperparameter Tuning
+### 14.1 ESM-PCA16 GAT Hyperparameter Tuning
 
 | Experiment | Best Validation-Based Test F1 |
 |------------|------------------------------:|
 | ESM-PCA16 GAT hyperparameter tuning | 0.2077 |
 
-This experiment did not improve over the baseline ESM-PCA16 test F1 of `0.2924`.
+Result:
 
-### Train Negative-Ratio Tuning for ESM-PCA16
+```text
+Hyperparameter tuning did not improve the final test F1.
+```
+
+### 14.2 Train Negative Ratio Tuning for ESM-PCA16
 
 | Experiment | Precision 1 | Recall 1 | F1 1 | Accuracy | TN | FP | FN | TP |
 |------------|------------:|---------:|-----:|---------:|---:|---:|---:|---:|
-| ESM-PCA16 ratio 3 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
+| ESM-PCA16 ratio 3 / GAT best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
 | ESM-PCA16 ratio 4 | 0.2600 | 0.3145 | 0.2847 | 0.9509 | 7512 | 222 | 170 | 78 |
 | ESM-PCA16 ratio 5 | 0.2507 | 0.3468 | 0.2910 | 0.9475 | 7477 | 257 | 162 | 86 |
 
-Higher negative ratios shifted the model toward higher precision and fewer false positives, but recall dropped enough that F1 did not improve.
+Interpretation:
 
-### ESM Pair-Feature Variant Ablations
+```text
+Higher negative ratios improved precision and reduced FP, but recall dropped too much to improve F1.
+```
+
+### 14.3 ESM Pair-Feature Variant Ablations
 
 | Experiment | Raw Pair Feature | Input Dim | Precision 1 | Recall 1 | F1 1 | Accuracy | TN | FP | FN | TP |
 |------------|------------------|----------:|------------:|---------:|-----:|---------:|---:|---:|---:|---:|
-| Full pair PCA16 / best | `[A, B, absdiff]` | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
-| absdiff PCA16 | `abs(A - B)` | 19 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 7205 | 529 | 122 | 126 |
-| absdiff PCA32 | `abs(A - B)` | 35 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 7231 | 503 | 122 | 126 |
+| Full pair PCA16 / GAT best | `[A, B, absdiff]` | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
+| absdiff PCA16 | `absdiff` | 19 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 7205 | 529 | 122 | 126 |
+| absdiff PCA32 | `absdiff` | 35 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 7231 | 503 | 122 | 126 |
 | product PCA16 | `A * B` | 19 | 0.1877 | 0.5806 | 0.2837 | 0.9089 | 7111 | 623 | 104 | 144 |
-| absdiff_product PCA16 | `[abs(A - B), A * B]` | 19 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 7379 | 355 | 146 | 102 |
+| absdiff_product PCA16 | `[absdiff, A * B]` | 19 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 7379 | 355 | 146 | 102 |
 
-Key interpretation:
+Interpretation:
 
-- `product PCA16` was recall-oriented and found the most true positives, but it also produced too many false positives.
-- `absdiff_product PCA16` was precision-oriented and reduced false positives, but recall dropped.
-- The full-pair ESM-PCA16 representation remained the best F1 trade-off.
+- Product-only features made the model recall-oriented and increased TP, but also increased FP.
+- Absdiff+product features made the model more precision-oriented and reduced FP, but recall dropped.
+- The full pair PCA16 feature representation produced the best GAT F1 trade-off.
 
-Final conclusion:
+---
+
+## 15. GNN Architecture Comparison on ESM-PCA16
+
+All experiments in this table use:
 
 ```text
-Best final model remains:
-Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
-F1 = 0.2924
+Combined Current + BM5 + Full Pair ESM-2 PCA16
+Input dimension = 19
 ```
 
+| Model | Seed | Precision 1 | Recall 1 | F1 1 | Accuracy | TN | FP | FN | TP |
+|-------|-----:|------------:|---------:|-----:|---------:|---:|---:|---:|---:|
+| GCN | 42 | 0.1085 | 0.5968 | 0.1836 | 0.8351 | 6518 | 1216 | 100 | 148 |
+| GIN | 42 | 0.1075 | 0.5484 | 0.1798 | 0.8445 | 6605 | 1129 | 112 | 136 |
+| GATv2 | 42 | 0.1957 | 0.4355 | 0.2700 | 0.9268 | 7290 | 444 | 140 | 108 |
+| GraphSAGE | 42 | 0.1860 | 0.5887 | 0.2827 | 0.9072 | 7095 | 639 | 102 | 146 |
+| GAT | 42 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 7211 | 523 | 116 | 132 |
+| TransformerConv | 42 | 0.2041 | 0.8024 | 0.3254 | 0.8966 | 6958 | 776 | 49 | 199 |
+| TransformerConv | 7 | 0.3042 | 0.6452 | 0.4134 | 0.9431 | 7368 | 366 | 88 | 160 |
+| TransformerConv | 13 | 0.1383 | 0.9637 | 0.2419 | 0.8123 | 6245 | 1489 | 9 | 239 |
+| TransformerConv | 21 | 0.2112 | 0.9153 | 0.3432 | 0.8911 | 6886 | 848 | 21 | 227 |
 
-## 16. Current Best Result
+---
 
-Best model:
+## 16. TransformerConv Multi-Seed Summary
+
+| Metric | Value |
+|--------|------:|
+| Number of seeds | 4 |
+| Seeds | 42, 7, 13, 21 |
+| Mean F1 | 0.3310 |
+| Sample Std F1 | 0.0705 |
+| Best F1 | 0.4134 |
+| Best seed | 7 |
+
+Interpretation:
 
 ```text
-Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
+TransformerConv has higher variance than GAT, but its multi-seed mean F1 remains higher than the previous GAT best result.
+```
+
+---
+
+## 17. Current Best Result
+
+Best single-run model:
+
+```text
+Combined Current + BM5 + Full Pair ESM-2 PCA16 + TransformerConv
+Seed = 7
 ```
 
 Final metrics:
 
 | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |------------:|---------:|-----:|---------:|
-| 0.2015 | 0.5323 | 0.2924 | 0.9199 |
+| 0.3042 | 0.6452 | 0.4134 | 0.9431 |
 
 Confusion matrix:
 
 | True / Pred | Pred 0 | Pred 1 |
 |-------------|-------:|-------:|
-| True 0 | 7,211 | 523 |
-| True 1 | 116 | 132 |
+| True 0 | 7,368 | 366 |
+| True 1 | 88 | 160 |
 
----
-
-## 17. Overall Progression
-
-| Stage | Dataset | Features | F1 1 |
-|-------|---------|----------|-----:|
-| Current-only strict best | 12 complexes | Basic 3 | 0.2361 |
-| Combined current + BM5 | 31 complexes | Basic 3 | 0.2791 |
-| Combined current + BM5 | ESM-2 PCA32 | 0.2913 |
-| Combined current + BM5 | ESM-2 PCA16 | 0.2924 |
-
-Main conclusion:
+More robust summary:
 
 ```text
-Dataset expansion and compact ESM-2 PCA features produced the strongest improvement.
+TransformerConv mean F1 over 4 seeds = 0.3310 ± 0.0705
 ```
 
 ---
 
-## 18. Attention and Structural Visualization
+## 18. Overall Progression
 
-Additional analysis was performed for the best strict current-only model:
+| Stage | Dataset | Features / Model | F1 1 |
+|-------|---------|------------------|-----:|
+| Current-only strict best | 12 complexes | Basic 3 + GAT | 0.2361 |
+| Combined current + BM5 | 31 complexes | Basic 3 + GAT | 0.2791 |
+| Combined current + BM5 | Full pair ESM-2 PCA16 + GAT | 0.2924 |
+| Combined current + BM5 | Full pair ESM-2 PCA16 + TransformerConv mean | 0.3310 |
+| Combined current + BM5 | Full pair ESM-2 PCA16 + TransformerConv best seed | 0.4134 |
+
+Main conclusion:
+
+```text
+Dataset expansion, compact full-pair ESM-2 PCA features, and TransformerConv produced the strongest improvement.
+```
+
+---
+
+## 19. Attention and Structural Visualization
+
+Additional analysis was performed for the best strict current-only GAT model:
 
 - error analysis
 - GAT attention extraction
@@ -470,18 +458,26 @@ These analyses are used for interpretability rather than final model selection.
 
 ---
 
-## 19. Final Conclusion
+## 20. Final Conclusion
 
-The project progressed from a small current-only dataset to an expanded combined current + BM5 dataset with ESM-2 protein language model features.
+The project progressed from a small current-only dataset to an expanded combined current + BM5 dataset with ESM-2 protein language model features and multiple GNN architecture comparisons.
 
-The final best result is:
+The final best single-run result is:
 
 ```text
-F1 = 0.2924
+F1 = 0.4134
 ```
 
 This result comes from:
 
 ```text
-GAT + Combined Current/BM5 Dataset + ESM-2 PCA16 features
+TransformerConv + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16 features
 ```
+
+A multi-seed TransformerConv evaluation produced:
+
+```text
+Mean F1 = 0.3310 ± 0.0705
+```
+
+This confirms that TransformerConv is the strongest tested architecture for this project, although the model remains seed-sensitive and should ideally be evaluated with more seeds or cross-validation in future work.

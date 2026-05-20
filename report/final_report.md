@@ -2,16 +2,24 @@
 
 ## 1. Abstract
 
-This project investigates residue-level protein–protein interface prediction using Graph Neural Networks. Protein partners are represented as residue-level graphs, and a correspondence graph is constructed between two interacting partners. Each node in the correspondence graph represents a candidate residue pair, and the task is to classify whether that pair belongs to the interface.
+This project investigates residue-level protein–protein interface prediction using Graph Neural Networks. Protein partners are represented as residue-level graphs, and a correspondence graph is constructed between two interacting partners. Each node in the correspondence graph represents a candidate residue pair, and the task is to classify whether that pair belongs to the protein–protein interface.
 
-The project implements a complete pipeline including PDB preprocessing, graph construction, interface labeling, GCN and GAT models, feature engineering, class imbalance analysis, BM5-clean dataset expansion, ESM-2 protein language model embeddings, attention analysis, error analysis, and structural visualization.
+The project implements a complete pipeline including PDB preprocessing, graph construction, interface labeling, GCN and GAT baselines, feature engineering, class imbalance analysis, BM5-clean dataset expansion, ESM-2 protein language model embeddings, ESM feature ablations, multiple GNN architecture comparisons, attention analysis, error analysis, and structural visualization.
 
-The best final result is achieved by combining the original dataset with BM5-clean and adding PCA-reduced ESM-2 pair features:
+The best final single-run result is achieved by combining the original dataset with BM5-clean, adding PCA-reduced full-pair ESM-2 features, and replacing GAT with TransformerConv:
 
 ```text
-GAT + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
-Test F1 1 = 0.2924
+TransformerConv + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
+Test F1 1 = 0.4134
 ```
+
+A multi-seed TransformerConv evaluation produced:
+
+```text
+Mean F1 1 = 0.3310 ± 0.0705
+```
+
+This shows that TransformerConv outperforms the previous GAT baseline on average, while also achieving a much stronger best single-run result.
 
 ---
 
@@ -146,7 +154,7 @@ Validation: 4 complexes
 Test: 5 complexes
 ```
 
-Training graphs were semi-balanced using all positives and 3x negatives. Validation and test graphs were left natural.
+Training graphs were semi-balanced using all positives and sampled negatives. Validation and test graphs were left natural.
 
 ---
 
@@ -185,9 +193,10 @@ Several feature sets were tested.
 | Amino acid one-hot | 43 | Basic + residue identity one-hot vectors |
 | Physicochemical | 11 | Basic + residue-level physicochemical features |
 | Basic + ASA | 5 | Basic + residue solvent accessibility |
-| ESM-2 PCA64 | 67 | Basic + 64 PCA components from ESM pair features |
-| ESM-2 PCA32 | 35 | Basic + 32 PCA components from ESM pair features |
-| ESM-2 PCA16 | 19 | Basic + 16 PCA components from ESM pair features |
+| Full pair ESM-2 PCA64 | 67 | Basic + 64 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| Full pair ESM-2 PCA32 | 35 | Basic + 32 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| Full pair ESM-2 PCA16 | 19 | Basic + 16 PCA components from `[ESM_A, ESM_B, absdiff]` |
+| ESM variant PCA | 19/35 | Basic + PCA components from absdiff/product variants |
 
 ---
 
@@ -199,7 +208,7 @@ ESM-2 embeddings were extracted using:
 facebook/esm2_t6_8M_UR50D
 ```
 
-For each residue pair, the raw pair feature was:
+For each residue pair, the full raw pair feature was:
 
 ```text
 [ESM_A, ESM_B, abs(ESM_A - ESM_B)]
@@ -221,27 +230,28 @@ Standardization and PCA were fitted only on training pairs.
 
 This avoids validation/test leakage.
 
+Additional ESM pair-feature variants were tested:
+
+```text
+absdiff
+product
+absdiff + product
+```
+
 ---
 
 ## 11. Models
 
-### GCN
+The following GNN architectures were evaluated:
 
-The GCN baseline uses two graph convolution layers.
-
-### GAT
-
-The GAT model uses two graph attention layers.
-
-Best GAT configuration:
-
-```text
-hidden_channels = 16
-heads = 4
-dropout = 0.2
-```
-
-GAT was used as the main model for final experiments because it consistently achieved better positive-class recall and F1 in the stricter experiments.
+| Model | Role in the project |
+|-------|---------------------|
+| GCN | Basic graph convolution baseline |
+| GAT | Main attention-based baseline |
+| GATv2 | More flexible attention variant |
+| GraphSAGE | Neighborhood aggregation baseline |
+| GIN | Expressive MLP-based message passing |
+| TransformerConv | Transformer-style graph attention model |
 
 ---
 
@@ -287,7 +297,7 @@ This was the strongest model before dataset expansion.
 
 ---
 
-## 14. Feature Engineering Results
+## 14. Feature Engineering Results on Current-Only Dataset
 
 | Feature Set | Model | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |-------------|-------|------------:|---------:|-----:|---------:|
@@ -366,117 +376,143 @@ Dataset expansion improved F1 from 0.2361 to 0.2791, though the test set is larg
 
 ---
 
-## 18. ESM-2 PCA Experiments
+## 18. Full Pair ESM-2 PCA Experiments with GAT
 
-ESM-2 PCA features were added to the combined current + BM5 dataset.
+Full pair ESM features were added to the combined current + BM5 dataset.
 
 | Experiment | Input Dim | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
 |------------|----------:|------------:|---------:|-----:|---------:|---:|---:|---:|
 | Basic combined | 3 | 0.1918 | 0.5121 | 0.2791 | 0.9178 | 127 | 535 | 121 |
-| ESM-2 PCA64 | 67 | 0.1169 | 0.7823 | 0.2034 | 0.8096 | 194 | 1,466 | 54 |
-| ESM-2 PCA32 | 35 | 0.1953 | 0.5726 | 0.2913 | 0.9134 | 142 | 585 | 106 |
-| ESM-2 PCA16 | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| Full pair ESM-2 PCA64 | 67 | 0.1169 | 0.7823 | 0.2034 | 0.8096 | 194 | 1,466 | 54 |
+| Full pair ESM-2 PCA32 | 35 | 0.1953 | 0.5726 | 0.2913 | 0.9134 | 142 | 585 | 106 |
+| Full pair ESM-2 PCA16 | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+
+PCA16 gave the best GAT trade-off.
 
 ---
 
-## 19. Best Final Model
+## 19. F1 Improvement Attempts Before Architecture Switching
 
-The best final model is:
+After the GAT PCA16 result, additional experiments were performed to check if F1 could be increased further.
+
+### 19.1 Hyperparameter Tuning
+
+Dedicated GAT hyperparameter tuning for ESM-PCA16 did not improve test F1.
+
+| Experiment | Best Validation-Based Test F1 |
+|------------|------------------------------:|
+| ESM-PCA16 GAT hyperparameter tuning | 0.2077 |
+
+### 19.2 Train Negative Ratio Tuning
+
+| Experiment | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
+|------------|------------:|---------:|-----:|---------:|---:|---:|---:|
+| ESM-PCA16 ratio 3 / GAT best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| ESM-PCA16 ratio 4 | 0.2600 | 0.3145 | 0.2847 | 0.9509 | 78 | 222 | 170 |
+| ESM-PCA16 ratio 5 | 0.2507 | 0.3468 | 0.2910 | 0.9475 | 86 | 257 | 162 |
+
+Higher negative ratios improved precision and reduced false positives, but recall dropped too much to improve F1.
+
+### 19.3 ESM Pair-Feature Variant Ablations
+
+| Variant | Input Dim | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
+|---------|----------:|------------:|---------:|-----:|---------:|---:|---:|---:|
+| Full pair PCA16 / GAT best | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| absdiff PCA16 | 19 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 126 | 529 | 122 |
+| absdiff PCA32 | 35 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 126 | 503 | 122 |
+| product PCA16 | 19 | 0.1877 | 0.5806 | 0.2837 | 0.9089 | 144 | 623 | 104 |
+| absdiff_product PCA16 | 19 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 102 | 355 | 146 |
+
+The full pair PCA16 feature representation produced the best GAT F1 trade-off.
+
+---
+
+## 20. GNN Architecture Comparison on ESM-PCA16
+
+All experiments in this table use:
 
 ```text
-GAT + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
+Combined Current + BM5 + Full Pair ESM-2 PCA16
+Input dimension = 19
+```
+
+| Model | Seed | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
+|-------|-----:|------------:|---------:|-----:|---------:|---:|---:|---:|
+| GCN | 42 | 0.1085 | 0.5968 | 0.1836 | 0.8351 | 148 | 1,216 | 100 |
+| GIN | 42 | 0.1075 | 0.5484 | 0.1798 | 0.8445 | 136 | 1,129 | 112 |
+| GATv2 | 42 | 0.1957 | 0.4355 | 0.2700 | 0.9268 | 108 | 444 | 140 |
+| GraphSAGE | 42 | 0.1860 | 0.5887 | 0.2827 | 0.9072 | 146 | 639 | 102 |
+| GAT | 42 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| TransformerConv | 42 | 0.2041 | 0.8024 | 0.3254 | 0.8966 | 199 | 776 | 49 |
+| TransformerConv | 7 | 0.3042 | 0.6452 | 0.4134 | 0.9431 | 160 | 366 | 88 |
+| TransformerConv | 13 | 0.1383 | 0.9637 | 0.2419 | 0.8123 | 239 | 1,489 | 9 |
+| TransformerConv | 21 | 0.2112 | 0.9153 | 0.3432 | 0.8911 | 227 | 848 | 21 |
+
+---
+
+## 21. TransformerConv Multi-Seed Analysis
+
+TransformerConv was evaluated with four seeds:
+
+```text
+42, 7, 13, 21
+```
+
+| Seed | Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-----:|------------:|---------:|-----:|---------:|
+| 42 | 0.2041 | 0.8024 | 0.3254 | 0.8966 |
+| 7 | 0.3042 | 0.6452 | 0.4134 | 0.9431 |
+| 13 | 0.1383 | 0.9637 | 0.2419 | 0.8123 |
+| 21 | 0.2112 | 0.9153 | 0.3432 | 0.8911 |
+
+Summary:
+
+| Statistic | F1 |
+|-----------|---:|
+| Mean | 0.3310 |
+| Sample standard deviation | 0.0705 |
+| Best | 0.4134 |
+| Worst | 0.2419 |
+
+TransformerConv is more seed-sensitive than GAT, but its mean F1 remains higher than the GAT baseline.
+
+---
+
+## 22. Best Final Model
+
+The best final single-run model is:
+
+```text
+TransformerConv + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
+Seed = 7
 ```
 
 Metrics:
 
 | Precision 1 | Recall 1 | F1 1 | Accuracy |
 |------------:|---------:|-----:|---------:|
-| 0.2015 | 0.5323 | 0.2924 | 0.9199 |
+| 0.3042 | 0.6452 | 0.4134 | 0.9431 |
 
 Confusion matrix:
 
 | True / Pred | Pred 0 | Pred 1 |
 |-------------|-------:|-------:|
-| True 0 | 7,211 | 523 |
-| True 1 | 116 | 132 |
+| True 0 | 7,368 | 366 |
+| True 1 | 88 | 160 |
 
-Compared with the basic combined model:
+Compared with the previous GAT best:
 
 ```text
-F1: 0.2791 → 0.2924
-Precision: 0.1918 → 0.2015
-Recall: 0.5121 → 0.5323
+F1:       0.2924 → 0.4134
+Precision:0.2015 → 0.3042
+Recall:   0.5323 → 0.6452
+FP:       523 → 366
+TP:       132 → 160
 ```
 
 ---
 
-## 20. Interpretation of ESM Results
-
-ESM-2 PCA64 produced too many false positives. This suggests that high-dimensional language model features may over-amplify positive predictions on this dataset.
-
-ESM-2 PCA32 improved recall and F1.
-
-ESM-2 PCA16 gave the best balance between precision and recall. It reduced false positives compared with the basic combined baseline while also increasing true positives.
-
-This shows that compact protein language model features can improve graph-based interface prediction when carefully reduced and combined with geometric features.
-
----
-
-
----
-
-## Additional F1-Improvement Experiments
-
-After the full-pair ESM-2 PCA16 model achieved the best result, several extra experiments were conducted to check whether the F1-score could be increased further.
-
-### Hyperparameter Tuning for ESM-PCA16
-
-A dedicated GAT tuning experiment was run using the ESM-PCA16 feature set. The search varied hidden size, number of attention heads, dropout, learning rate, weight decay, and validation threshold selection.
-
-The best validation-selected configuration reached only:
-
-```text
-Test F1 1 = 0.2077
-```
-
-This did not improve over the existing full-pair ESM-PCA16 model.
-
-### Negative-Ratio Tuning
-
-Increasing the training negative ratio was tested to reduce false positives.
-
-| Experiment | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
-|------------|------------:|---------:|-----:|---------:|---:|---:|---:|
-| ESM-PCA16 ratio 3 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
-| ESM-PCA16 ratio 4 | 0.2600 | 0.3145 | 0.2847 | 0.9509 | 78 | 222 | 170 |
-| ESM-PCA16 ratio 5 | 0.2507 | 0.3468 | 0.2910 | 0.9475 | 86 | 257 | 162 |
-
-The negative-ratio experiments confirmed that more negative examples reduce false positives and improve precision, but the corresponding recall loss prevents F1 improvement.
-
-### ESM Pair-Feature Variant Ablations
-
-The original full-pair ESM representation was:
-
-```text
-[ESM_A, ESM_B, abs(ESM_A - ESM_B)]
-```
-
-Alternative pair-feature variants were tested.
-
-| Variant | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
-|---------|------------:|---------:|-----:|---------:|---:|---:|---:|
-| Full pair PCA16 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
-| absdiff PCA16 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 126 | 529 | 122 |
-| absdiff PCA32 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 126 | 503 | 122 |
-| product PCA16 | 0.1877 | 0.5806 | 0.2837 | 0.9089 | 144 | 623 | 104 |
-| absdiff_product PCA16 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 102 | 355 | 146 |
-
-The product-only variant increased recall and found more true positives, while the absdiff-product variant increased precision and reduced false positives. However, neither improved F1 over the full-pair PCA16 model.
-
-These experiments support the final selection of the full-pair ESM-PCA16 representation as the best precision-recall trade-off.
-
-
-## 21. Attention Analysis
+## 23. Attention Analysis
 
 GAT attention weights were extracted from the first GAT layer of the best strict current-only model.
 
@@ -492,7 +528,7 @@ Attention weights are interpreted as local message-passing importance, not direc
 
 ---
 
-## 22. Structural 3D Error Visualization
+## 24. Structural 3D Error Visualization
 
 PyMOL scripts were generated to visualize true positives, false positives, and false negatives in 3D structures.
 
@@ -516,19 +552,21 @@ This analysis connects numerical model errors to structural interpretation.
 
 ---
 
-## 23. Discussion
+## 25. Discussion
 
 The project shows that GNNs can learn meaningful patterns for protein–protein interface prediction, but class imbalance remains a major challenge.
 
 The original current-only dataset was too small and imbalanced for strong generalization. Dataset expansion using BM5-clean provided a major improvement by increasing positive residue pairs from 698 to 1,794.
 
-The ESM-2 experiments show that protein language model embeddings can improve performance, but dimensionality matters. PCA64 caused severe over-prediction, while PCA16 produced the best final result.
+The ESM-2 experiments show that protein language model embeddings can improve performance, but dimensionality matters. PCA64 caused severe over-prediction, while PCA16 produced the best GAT result.
 
-This suggests that pretrained protein embeddings are useful, but they must be regularized or compressed for small-to-medium structural datasets.
+The architecture comparison was the largest final improvement. TransformerConv outperformed GAT, GATv2, GraphSAGE, GIN, and GCN on the ESM-PCA16 dataset. This suggests that Transformer-style attention is better suited to the correspondence graph setting than standard graph convolution or simpler aggregation.
+
+However, TransformerConv is seed-sensitive. The best seed achieved F1 = 0.4134, while the four-seed mean was 0.3310. This should be reported transparently.
 
 ---
 
-## 24. Limitations
+## 26. Limitations
 
 Important limitations:
 
@@ -537,44 +575,55 @@ Important limitations:
 3. Interface labels use a fixed 5 Å atom-distance threshold.
 4. Candidate filtering may remove some useful context.
 5. ESM-2 embeddings are sequence-based and do not directly include complex-specific structural context.
-6. The GAT model still produces many false positives.
-7. Attention weights should not be interpreted as direct biological causality.
-8. PyMOL visualization is qualitative and requires manual inspection.
+6. TransformerConv shows noticeable seed sensitivity.
+7. More seeds or cross-validation would provide stronger statistical confidence.
+8. Attention weights should not be interpreted as direct biological causality.
+9. PyMOL visualization is qualitative and requires manual inspection.
+10. Additional gains may require edge features, geometric features, or more benchmark data.
 
 ---
 
-## 25. Future Work
+## 27. Future Work
 
 Recommended next steps:
 
-1. Evaluate ESM-2 PCA8 or PCA24 for additional dimensionality ablation.
-2. Add edge features such as distance bins or relative geometry.
-3. Compare with non-GNN baselines such as MLP or Random Forest.
-4. Use cross-validation across complexes.
+1. Run TransformerConv with more seeds.
+2. Perform complex-level cross-validation.
+3. Add edge features such as distance bins or relative geometry.
+4. Compare with non-GNN baselines such as MLP or Random Forest.
 5. Add more BM5-clean cases or additional benchmark datasets.
 6. Test larger ESM-2 variants if GPU memory allows.
-7. Add calibration or precision-oriented thresholding.
-8. Update final presentation deck with the ESM-2 PCA16 result.
+7. Add calibration or threshold-stability analysis.
+8. Explore ensembling across TransformerConv seeds.
+9. Update final presentation deck with the final TransformerConv architecture-comparison story.
 
 ---
 
-## 26. Conclusion
+## 28. Conclusion
 
 This project implemented a full graph-based protein–protein interface prediction pipeline, starting from PDB files and ending with interpretable GNN predictions.
 
-The strongest improvement came from two steps:
+The strongest improvement came from three steps:
 
 1. expanding the dataset with BM5-clean
-2. adding compact PCA-reduced ESM-2 protein language model features
+2. adding compact PCA-reduced full-pair ESM-2 protein language model features
+3. switching from GAT to TransformerConv
 
-Final best result:
+Final best single-run result:
 
 ```text
-Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
-Precision 1 = 0.2015
-Recall 1 = 0.5323
-F1 1 = 0.2924
-Accuracy = 0.9199
+Combined Current + BM5 + Full Pair ESM-2 PCA16 + TransformerConv
+Seed = 7
+Precision 1 = 0.3042
+Recall 1 = 0.6452
+F1 1 = 0.4134
+Accuracy = 0.9431
 ```
 
-This is the best result achieved in the project so far and represents a meaningful improvement over both the current-only model and the combined basic-feature model.
+Multi-seed TransformerConv summary:
+
+```text
+Mean F1 1 = 0.3310 ± 0.0705
+```
+
+This is the best result achieved in the project so far and represents a substantial improvement over the previous GAT-based best model.

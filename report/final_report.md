@@ -9,7 +9,7 @@ The project implements a complete pipeline including PDB preprocessing, graph co
 The best final result is achieved by combining the original dataset with BM5-clean and adding PCA-reduced ESM-2 pair features:
 
 ```text
-GAT + Combined Current/BM5 Dataset + ESM-2 PCA16
+GAT + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
 Test F1 1 = 0.2924
 ```
 
@@ -384,7 +384,7 @@ ESM-2 PCA features were added to the combined current + BM5 dataset.
 The best final model is:
 
 ```text
-GAT + Combined Current/BM5 Dataset + ESM-2 PCA16
+GAT + Combined Current/BM5 Dataset + Full Pair ESM-2 PCA16
 ```
 
 Metrics:
@@ -421,6 +421,60 @@ ESM-2 PCA16 gave the best balance between precision and recall. It reduced false
 This shows that compact protein language model features can improve graph-based interface prediction when carefully reduced and combined with geometric features.
 
 ---
+
+
+---
+
+## Additional F1-Improvement Experiments
+
+After the full-pair ESM-2 PCA16 model achieved the best result, several extra experiments were conducted to check whether the F1-score could be increased further.
+
+### Hyperparameter Tuning for ESM-PCA16
+
+A dedicated GAT tuning experiment was run using the ESM-PCA16 feature set. The search varied hidden size, number of attention heads, dropout, learning rate, weight decay, and validation threshold selection.
+
+The best validation-selected configuration reached only:
+
+```text
+Test F1 1 = 0.2077
+```
+
+This did not improve over the existing full-pair ESM-PCA16 model.
+
+### Negative-Ratio Tuning
+
+Increasing the training negative ratio was tested to reduce false positives.
+
+| Experiment | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
+|------------|------------:|---------:|-----:|---------:|---:|---:|---:|
+| ESM-PCA16 ratio 3 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| ESM-PCA16 ratio 4 | 0.2600 | 0.3145 | 0.2847 | 0.9509 | 78 | 222 | 170 |
+| ESM-PCA16 ratio 5 | 0.2507 | 0.3468 | 0.2910 | 0.9475 | 86 | 257 | 162 |
+
+The negative-ratio experiments confirmed that more negative examples reduce false positives and improve precision, but the corresponding recall loss prevents F1 improvement.
+
+### ESM Pair-Feature Variant Ablations
+
+The original full-pair ESM representation was:
+
+```text
+[ESM_A, ESM_B, abs(ESM_A - ESM_B)]
+```
+
+Alternative pair-feature variants were tested.
+
+| Variant | Precision 1 | Recall 1 | F1 1 | Accuracy | TP | FP | FN |
+|---------|------------:|---------:|-----:|---------:|---:|---:|---:|
+| Full pair PCA16 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 132 | 523 | 116 |
+| absdiff PCA16 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 126 | 529 | 122 |
+| absdiff PCA32 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 126 | 503 | 122 |
+| product PCA16 | 0.1877 | 0.5806 | 0.2837 | 0.9089 | 144 | 623 | 104 |
+| absdiff_product PCA16 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 102 | 355 | 146 |
+
+The product-only variant increased recall and found more true positives, while the absdiff-product variant increased precision and reduced false positives. However, neither improved F1 over the full-pair PCA16 model.
+
+These experiments support the final selection of the full-pair ESM-PCA16 representation as the best precision-recall trade-off.
+
 
 ## 21. Attention Analysis
 
@@ -516,7 +570,7 @@ The strongest improvement came from two steps:
 Final best result:
 
 ```text
-Combined Current + BM5 + ESM-2 PCA16 + GAT
+Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
 Precision 1 = 0.2015
 Recall 1 = 0.5323
 F1 1 = 0.2924

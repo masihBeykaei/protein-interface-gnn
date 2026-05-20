@@ -440,6 +440,74 @@ PyMOL color legend:
 
 ---
 
+
+---
+
+## Final F1-Improvement Ablation Study
+
+After reaching the best ESM-2 PCA16 result, several additional experiments were performed to check whether the positive-class F1-score could be improved further.
+
+### ESM-PCA16 Hyperparameter Tuning
+
+A dedicated GAT hyperparameter tuning experiment was run for the ESM-PCA16 feature set. The best configuration selected by validation F1 did not improve the test F1 over the existing PCA16 baseline.
+
+| Experiment | Best Validation-Based Test F1 |
+|------------|------------------------------:|
+| ESM-PCA16 GAT hyperparameter tuning | 0.2077 |
+
+Interpretation:
+
+```text
+Changing GAT capacity, heads, dropout, learning rate, and weight decay did not improve the final test F1.
+```
+
+### Train Negative-Ratio Tuning for ESM-PCA16
+
+| Experiment | Precision 1 | Recall 1 | F1 1 | Accuracy | FP | TP |
+|------------|------------:|---------:|-----:|---------:|---:|---:|
+| ESM-PCA16 ratio 3 / best | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 523 | 132 |
+| ESM-PCA16 ratio 4 | 0.2600 | 0.3145 | 0.2847 | 0.9509 | 222 | 78 |
+| ESM-PCA16 ratio 5 | 0.2507 | 0.3468 | 0.2910 | 0.9475 | 257 | 86 |
+
+Interpretation:
+
+```text
+Increasing the negative ratio made the model more precision-oriented and reduced false positives, but recall dropped too much to improve F1.
+```
+
+### ESM Pair-Feature Variant Ablations
+
+The original full-pair ESM representation was:
+
+```text
+[ESM_A, ESM_B, abs(ESM_A - ESM_B)]
+```
+
+Additional variants were tested:
+
+| Experiment | Raw ESM Pair Feature | Input Dim | Precision 1 | Recall 1 | F1 1 | Accuracy | FP | TP |
+|------------|----------------------|----------:|------------:|---------:|-----:|---------:|---:|---:|
+| Full pair PCA16 / best | `[A, B, absdiff]` | 19 | 0.2015 | 0.5323 | 0.2924 | 0.9199 | 523 | 132 |
+| absdiff PCA16 | `abs(A - B)` | 19 | 0.1924 | 0.5081 | 0.2791 | 0.9184 | 529 | 126 |
+| absdiff PCA32 | `abs(A - B)` | 35 | 0.2003 | 0.5081 | 0.2873 | 0.9217 | 503 | 126 |
+| product PCA16 | `A * B` | 19 | 0.1877 | 0.5806 | 0.2837 | 0.9089 | 623 | 144 |
+| absdiff_product PCA16 | `[abs(A - B), A * B]` | 19 | 0.2232 | 0.4113 | 0.2894 | 0.9372 | 355 | 102 |
+
+Interpretation:
+
+- `product PCA16` produced the highest recall and TP count, but false positives increased.
+- `absdiff_product PCA16` improved precision and reduced false positives, but recall dropped.
+- The full-pair PCA16 representation remained the best overall F1 trade-off.
+
+Final result after all improvement attempts:
+
+```text
+Best final model remains:
+Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
+F1 = 0.2924
+```
+
+
 ## Current Best Model
 
 ```text
@@ -577,6 +645,8 @@ The strongest improvements came from:
 The final best model is:
 
 ```text
-Combined Current + BM5 + ESM-2 PCA16 + GAT
+Combined Current + BM5 + Full Pair ESM-2 PCA16 + GAT
 F1 = 0.2924
 ```
+
+Final ablation experiments showed that hyperparameter tuning, higher negative ratios, and ESM feature variants did not improve beyond this score.

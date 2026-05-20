@@ -1,0 +1,2 @@
+model,input_dim,hidden_channels,heads,dropout,beta,lr,weight_decay,best_epoch,threshold,val_p1,val_r1,val_f1,val_acc,test_p1,test_r1,test_f1,test_acc,tn,fp,fn,tp
+TransformerConv,19,16,4,0.3,True,0.003,0.001,5,0.6000000000000002,0.26948775055679286,0.88,0.41261722080136404,0.9308371812888978,0.2111627906976744,0.9153225806451613,0.3431594860166289,0.8911300425958406,6886,848,21,227

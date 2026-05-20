@@ -113,7 +113,7 @@ Input dimension:
 
 ---
 
-## 4. Processed Protein Complexes
+## 4. Original Current Dataset
 
 | Case | Nodes | Positive | Negative | Positive Ratio | Edges |
 |------|-------|----------|----------|----------------|-------|
@@ -130,19 +130,107 @@ Input dimension:
 | 3HMX_LH_AB | 2,310 | 72 | 2,238 | 0.0312 | 208,680 |
 | 3MJ9_HL_A | 3,283 | 88 | 3,195 | 0.0268 | 310,000 |
 
-### Total Dataset
+### Original Current Dataset Total
 
 | Total Nodes | Total Positive | Total Negative | Positive Ratio |
 |------------|----------------|----------------|----------------|
 | 20,707 | 698 | 20,009 | 0.0337 |
 
-The dataset is highly imbalanced, which is expected in protein–protein interface prediction.
+---
+
+## 5. BM5-Clean Dataset Expansion
+
+BM5-clean was used to increase dataset size and diversity.
+
+### BM5 Import and Screening
+
+| Stage | Count |
+|-------|------:|
+| Imported BM5 reference complexes | 29 |
+| Accepted after screening | 19 |
+| Rejected after screening | 10 |
+
+Screening criteria:
+
+```text
+positive >= 30
+positive_ratio >= 0.02
+candidate_nodes <= 8000
+```
+
+Accepted BM5 positives:
+
+```text
+1,096
+```
+
+### Accepted BM5 Cases
+
+| Case | Candidate Nodes | Positive | Positive Ratio | Status |
+|------|----------------:|---------:|---------------:|--------|
+| BM5_1A2K_A_B | 1,610 | 45 | 0.0280 | accepted |
+| BM5_1BJ1_A_B | 1,260 | 67 | 0.0532 | accepted |
+| BM5_1EZU_A_B | 4,680 | 100 | 0.0214 | accepted |
+| BM5_1FCC_A_B | 1,330 | 43 | 0.0323 | accepted |
+| BM5_1JWH_A_B | 1,435 | 41 | 0.0286 | accepted |
+| BM5_1ML0_A_B | 2,714 | 73 | 0.0269 | accepted |
+| BM5_1OFU_A_B | 1,715 | 50 | 0.0292 | accepted |
+| BM5_1QFW_A_B | 1,050 | 75 | 0.0714 | accepted |
+| BM5_1RLB_A_B | 1,666 | 48 | 0.0288 | accepted |
+| BM5_1RV6_A_B | 1,376 | 45 | 0.0327 | accepted |
+| BM5_1WDW_A_B | 4,030 | 111 | 0.0275 | accepted |
+| BM5_1XU1_A_B | 1,320 | 55 | 0.0417 | accepted |
+| BM5_2B4J_A_B | 936 | 39 | 0.0417 | accepted |
+| BM5_3BP8_A_B | 1,824 | 52 | 0.0285 | accepted |
+| BM5_3LVK_A_B | 945 | 37 | 0.0392 | accepted |
+| BM5_4FQI_A_B | 1,144 | 42 | 0.0367 | accepted |
+| BM5_4GXU_A_B | 2,173 | 53 | 0.0244 | accepted |
+| BM5_4HX3_A_B | 2,958 | 81 | 0.0274 | accepted |
+| BM5_4LW4_A_B | 1,530 | 39 | 0.0255 | accepted |
 
 ---
 
-## 5. Class Imbalance Handling
+## 6. Combined Current + BM5 Dataset
 
-Multi-graph training uses a balanced loss mask.
+The original current dataset and accepted BM5 cases were combined.
+
+### Combined Case Counts
+
+| Source | Cases |
+|--------|------:|
+| Current dataset | 12 |
+| BM5-clean accepted | 19 |
+| Combined total | 31 |
+
+### Combined Processed Dataset
+
+The combined dataset was built using train-balanced / natural-evaluation construction.
+
+| Total Saved Nodes | Total Positive | Total Negative | Positive Ratio |
+|------------------:|---------------:|---------------:|---------------:|
+| 23,028 | 1,794 | 21,234 | 0.0779 |
+
+Split counts:
+
+| Split | Cases |
+|-------|------:|
+| Train | 22 |
+| Validation | 4 |
+| Test | 5 |
+
+The training split was semi-balanced using:
+
+```text
+all positive pairs + 3 × positive_count negative pairs
+```
+
+Validation and test splits kept their natural class imbalance.
+
+---
+
+## 7. Class Imbalance Handling
+
+Multi-graph training originally used a balanced loss mask.
 
 For each training batch:
 
@@ -162,9 +250,11 @@ Default setting:
 NEGATIVE_RATIO = 5
 ```
 
+Later experiments also tested dataset-level train balancing and hard negative mining.
+
 ---
 
-## 6. Initial Multi-Graph GCN Results
+## 8. Initial Multi-Graph GCN Results
 
 Script:
 
@@ -178,19 +268,6 @@ Configuration:
 NEGATIVE_RATIO = 5
 threshold = 0.50
 features = basic 3 features
-```
-
-### Train Results
-
-| Class | Precision | Recall | F1-score | Support |
-|-------|-----------|--------|----------|---------|
-| 0 | 0.9764 | 0.9627 | 0.9695 | 15,612 |
-| 1 | 0.2402 | 0.3364 | 0.2803 | 547 |
-
-Accuracy:
-
-```text
-0.9415
 ```
 
 ### Test Results
@@ -208,7 +285,7 @@ Accuracy:
 
 ---
 
-## 7. Initial Multi-Graph GAT Results
+## 9. Initial Multi-Graph GAT Results
 
 Script:
 
@@ -222,19 +299,6 @@ Configuration:
 NEGATIVE_RATIO = 5
 threshold = 0.50
 features = basic 3 features
-```
-
-### Train Results
-
-| Class | Precision | Recall | F1-score | Support |
-|-------|-----------|--------|----------|---------|
-| 0 | 0.9939 | 0.8071 | 0.8908 | 15,612 |
-| 1 | 0.1350 | 0.8592 | 0.2333 | 547 |
-
-Accuracy:
-
-```text
-0.8088
 ```
 
 ### Test Results
@@ -252,18 +316,7 @@ Accuracy:
 
 ---
 
-## 8. Initial Model Comparison
-
-| Model | Precision 1 | Recall 1 | F1-score 1 | Accuracy |
-|-------|-------------|----------|------------|----------|
-| Multi-Graph GCN | 0.2068 | 0.3245 | 0.2526 | 0.9362 |
-| Multi-Graph GAT | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
-
-GCN is more conservative. GAT is more sensitive and achieves much higher positive-class recall.
-
----
-
-## 9. Negative Ratio Tuning
+## 10. Negative Ratio Tuning
 
 Script:
 
@@ -282,16 +335,9 @@ experiments/tune_negative_ratio.py
 | GAT | 5 | 0.1274 | 0.7483 | 0.2177 | 0.8215 |
 | GAT | 10 | 0.1985 | 0.1788 | 0.1882 | 0.9488 |
 
-Best by positive-class F1:
-
-| Model | Best Negative Ratio | Precision 1 | Recall 1 | F1 1 |
-|-------|---------------------|-------------|----------|------|
-| GCN | 5 | 0.2059 | 0.3245 | 0.2519 |
-| GAT | 5 | 0.1274 | 0.7483 | 0.2177 |
-
 ---
 
-## 10. Probability Threshold Tuning
+## 11. Probability Threshold Tuning
 
 Script:
 
@@ -316,7 +362,7 @@ This experiment is exploratory because threshold tuning was performed on the tes
 
 ---
 
-## 11. Strict Train/Validation/Test Early Stopping Experiment
+## 12. Strict Current-Only Train/Validation/Test Experiment
 
 Script:
 
@@ -331,7 +377,7 @@ The validation set is used for:
 
 The test set is used only for final evaluation.
 
-### Split
+### Current-Only Split
 
 #### Train Graphs
 
@@ -356,81 +402,18 @@ The test set is used only for final evaluation.
 
 ---
 
-## 12. Basic 3-Feature Results
+## 13. Basic 3-Feature Results
 
 | Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
 | GCN | 3 | 7 | 0.50 | 0.3434 | 0.2787 | 0.3077 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
 | GAT | 3 | 56 | 0.50 | 0.1589 | 0.6721 | 0.2571 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
 
-This is the most scientifically reliable experiment for the basic representation.
+This was the strongest current-only result before dataset expansion.
 
 ---
 
-## 13. Amino Acid One-Hot Feature Experiment
-
-Input dimension:
-
-```text
-43
-```
-
-| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
-| GCN | 43 | 11 | 0.40 | 0.1909 | 0.3443 | 0.2456 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
-| GAT | 43 | 34 | 0.40 | 0.1279 | 0.6885 | 0.2157 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
-
-Amino acid identity increased recall but also increased false positives.
-
----
-
-## 14. Physicochemical Feature Experiment
-
-Input dimension:
-
-```text
-11
-```
-
-| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
-| GCN | 11 | 24 | 0.60 | 0.2804 | 0.2459 | 0.2620 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
-| GAT | 11 | 22 | 0.50 | 0.1548 | 0.6066 | 0.2467 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
-
-Physicochemical features improved over one-hot for GAT, but did not beat the basic GAT result.
-
----
-
-## 15. Accessible Surface Area Feature Experiment
-
-Input dimension:
-
-```text
-5
-```
-
-Feature vector:
-
-```text
-[
-  CA_distance,
-  degree_partner_1,
-  degree_partner_2,
-  ASA_A,
-  ASA_B
-]
-```
-
-| Model | Input Dim | Best Epoch | Best Threshold | Val Precision 1 | Val Recall 1 | Val F1 1 | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|-------|-----------|------------|----------------|-----------------|--------------|----------|------------------|---------------|-----------|---------------|
-| GCN | 5 | 35 | 0.60 | 0.2251 | 0.5000 | 0.3104 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
-| GAT | 5 | 191 | 0.50 | 0.3050 | 0.3525 | 0.3270 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
-
-ASA improved GCN substantially. For GAT, ASA increased precision but reduced recall. Its F1-score is very close to the best basic GAT result.
-
----
-
-## 16. Feature Set Comparison
+## 14. Feature Set Comparison
 
 | Feature Set | Input Dim | Model | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
 |------------|-----------|-------|------------------|---------------|-----------|---------------|
@@ -445,7 +428,7 @@ ASA improved GCN substantially. For GAT, ASA increased precision but reduced rec
 
 ---
 
-## 17. GAT Hyperparameter Tuning
+## 15. GAT Hyperparameter Tuning
 
 Script:
 
@@ -473,9 +456,9 @@ Larger GAT models did not improve generalization.
 
 ---
 
-## 18. Error Analysis
+## 16. Current-Only Error Analysis
 
-Error analysis was performed for the current best strict model:
+Error analysis was performed for the previous best strict current-only model:
 
 ```text
 GAT + basic 3 features
@@ -519,9 +502,134 @@ This suggests the model is sensitive but not highly precise.
 
 ---
 
-## 19. GAT Attention Analysis
+## 17. Imbalance Ablation Experiments
 
-Attention weights were extracted from the first GATConv layer of the best strict GAT model.
+Several imbalance strategies were tested while keeping validation/test natural.
+
+| Experiment | Test Setup | Precision 1 | Recall 1 | F1 1 | Accuracy | TN | FP | FN | TP |
+|------------|------------|-------------|----------|------|----------|----|----|----|----|
+| Original strict GAT | Current-only natural test | 0.1746 | 0.3642 | 0.2361 | 0.9217 | 4137 | 260 | 96 | 55 |
+| Train-balanced random | Current-only natural test | 0.1338 | 0.3642 | 0.1957 | 0.9006 | 4041 | 356 | 96 | 55 |
+| Hard negative ratio 5 | Current-only natural test | 0.1519 | 0.4437 | 0.2264 | 0.8993 | 4023 | 374 | 84 | 67 |
+| Hard negative ratio 10 | Current-only natural test | 0.1489 | 0.3510 | 0.2091 | 0.9118 | 4094 | 303 | 98 | 53 |
+
+Interpretation:
+
+- Random train balancing did not improve F1.
+- Hard negative ratio 5 improved recall but increased false positives.
+- Hard negative ratio 10 reduced false positives relative to ratio 5 but still did not improve F1.
+- Randomly removing negative nodes from graphs can remove useful message-passing context.
+
+---
+
+## 18. BM5-Only Experiment
+
+Dataset:
+
+```text
+BM5-clean accepted cases only
+19 accepted complexes
+1,096 positive residue pairs
+```
+
+Build strategy:
+
+```text
+Train: semi-balanced
+Validation: natural
+Test: natural
+```
+
+Script:
+
+```text
+experiments/train_expanded_gat.py
+```
+
+### BM5-Only GAT Results
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1824 | 0.8144 | 0.2981 | 0.8917 |
+
+Confusion matrix:
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 2983 | 354 |
+| True 1 | 18 | 79 |
+
+This result is not directly comparable to the current-only result because the test set is different. However, it shows that the expanded BM5 dataset provides useful training signal and substantially improves recall on BM5 natural test complexes.
+
+---
+
+## 19. Combined Current + BM5 Experiment
+
+Dataset:
+
+```text
+Current dataset + BM5 accepted dataset
+31 usable complexes
+23,028 saved nodes
+1,794 positive residue pairs
+21,234 negative residue pairs
+```
+
+Split:
+
+```text
+Train: 22 complexes
+Validation: 4 complexes
+Test: 5 complexes
+```
+
+Build strategy:
+
+```text
+Train: semi-balanced using all positives + 3x negatives
+Validation: natural
+Test: natural
+```
+
+Script:
+
+```text
+experiments/train_expanded_gat.py
+```
+
+### Combined Current + BM5 GAT Results
+
+| Precision 1 | Recall 1 | F1 1 | Accuracy |
+|-------------|----------|------|----------|
+| 0.1918 | 0.5121 | 0.2791 | 0.9178 |
+
+Confusion matrix:
+
+| True / Pred | Pred 0 | Pred 1 |
+|-------------|--------|--------|
+| True 0 | 7199 | 535 |
+| True 1 | 121 | 127 |
+
+Comparison:
+
+| Experiment | Test Setting | Precision 1 | Recall 1 | F1 1 |
+|------------|--------------|-------------|----------|------|
+| Current-only strict GAT | 3 current test complexes | 0.1746 | 0.3642 | 0.2361 |
+| BM5-only GAT | 2 BM5 test complexes | 0.1824 | 0.8144 | 0.2981 |
+| Combined current + BM5 GAT | 5 combined test complexes | 0.1918 | 0.5121 | 0.2791 |
+
+Interpretation:
+
+- Combined current + BM5 improved F1 from `0.2361` to `0.2791`.
+- Recall improved from `0.3642` to `0.5121`.
+- The test set changed after dataset expansion, so this is not a perfect one-to-one comparison.
+- Still, the result shows that dataset expansion improves GAT behavior under a larger and more diverse natural-test evaluation.
+
+---
+
+## 20. GAT Attention Analysis
+
+Attention weights were extracted from the first GATConv layer of the best strict current-only GAT model.
 
 Scripts:
 
@@ -550,24 +658,13 @@ The full table is intentionally not committed:
 experiments/gat_attention_weights.csv
 ```
 
-### Interpretation
-
-Raw top attention edges were dominated by self-loops. The refined attention analysis separates attention edges by prediction context:
-
-- non-self edges
-- predicted-positive context
-- true-positive context
-- false-positive context
-- false-negative context
-- FP/FN error context
-
 GAT attention should be interpreted as local message-passing importance rather than direct biological importance.
 
 ---
 
-## 20. Structural 3D Error Visualization
+## 21. Structural 3D Error Visualization
 
-Structural visualization files were generated for the best strict model:
+Structural visualization files were generated for the best strict current-only model:
 
 ```text
 GAT + basic 3 features
@@ -595,27 +692,6 @@ structural_error_visualization_pairs.csv
 structural_error_visualization_summary.md
 ```
 
-### Test Metrics Used for Visualization
-
-| Precision 1 | Recall 1 | F1 1 | Accuracy |
-|-------------|----------|------|----------|
-| 0.1746 | 0.3642 | 0.2361 | 0.9217 |
-
-### Confusion Matrix
-
-| True / Pred | Pred 0 | Pred 1 |
-|-------------|--------|--------|
-| True 0 | 4137 | 260 |
-| True 1 | 96 | 55 |
-
-### Available Error Counts
-
-| Case | TP | FP | FN |
-|------|----|----|----|
-| 1BRS_A_B | 11 | 70 | 5 |
-| 1FSS_A_B | 19 | 88 | 44 |
-| 3HMX_LH_AB | 25 | 102 | 47 |
-
 ### Selected Residue Pairs for Visualization
 
 Top `10` pairs per class were selected when available.
@@ -634,71 +710,28 @@ Top `10` pairs per class were selected when available.
 | Red | False Positive residue pairs |
 | Orange | False Negative residue pairs |
 
-Example:
-
-```bash
-pymol experiments/structural_error_visualization/1BRS_A_B_structural_errors.pml
-```
-
-This step connects numerical error analysis with qualitative 3D structural inspection.
-
 ---
 
-## 21. Experiment Figures
+## 22. Current Best Result
 
-Generated plots are stored in:
+The current strongest result comes from dataset expansion:
 
 ```text
-experiments/figures/
+Combined current + BM5 GAT
+Test F1 1 = 0.2791
 ```
 
-Figures include:
-
-| File | Description |
-|------|-------------|
-| `class_imbalance.png` | Positive vs negative correspondence node counts |
-| `feature_set_f1_comparison.png` | Positive-class F1 comparison across feature sets |
-| `feature_set_precision_recall_f1.png` | Precision, recall, and F1 comparison across feature sets |
-| `best_strict_gcn_vs_gat.png` | GCN vs GAT under the strict train/validation/test protocol |
-| `negative_ratio_tuning_gcn.png` | Negative sampling ratio tuning for GCN |
-| `negative_ratio_tuning_gat.png` | Negative sampling ratio tuning for GAT |
-| `threshold_tuning_gcn.png` | Probability threshold tuning for GCN |
-| `threshold_tuning_gat.png` | Probability threshold tuning for GAT |
-| `gat_attention_distribution.png` | Distribution of GAT attention weights |
-| `gat_attention_distribution_log.png` | Log-scale distribution of GAT attention weights |
-
----
-
-## 22. Current Best Scientifically Reliable Result
-
-| Feature Set | Model | Best Epoch | Threshold | Test Precision 1 | Test Recall 1 | Test F1 1 | Test Accuracy |
-|------------|-------|------------|-----------|------------------|---------------|-----------|---------------|
-| Basic 3 features | GCN | 7 | 0.50 | 0.1940 | 0.1722 | 0.1825 | 0.9488 |
-| Basic 3 features | GAT | 56 | 0.50 | 0.1746 | 0.3642 | 0.2361 | 0.9217 |
-| Amino acid one-hot, 43 features | GCN | 11 | 0.40 | 0.1313 | 0.2781 | 0.1783 | 0.9149 |
-| Amino acid one-hot, 43 features | GAT | 34 | 0.40 | 0.1051 | 0.7285 | 0.1836 | 0.7850 |
-| Physicochemical, 11 features | GCN | 24 | 0.60 | 0.2254 | 0.1060 | 0.1441 | 0.9582 |
-| Physicochemical, 11 features | GAT | 22 | 0.50 | 0.1566 | 0.2914 | 0.2037 | 0.9244 |
-| Basic + ASA, 5 features | GCN | 35 | 0.60 | 0.1887 | 0.2649 | 0.2204 | 0.9378 |
-| Basic + ASA, 5 features | GAT | 191 | 0.50 | 0.2184 | 0.2517 | 0.2338 | 0.9453 |
-
-Current best model:
+Previous best current-only result:
 
 ```text
-GAT with basic 3-feature representation
+Current-only strict GAT
+Test F1 1 = 0.2361
 ```
 
-Best strict positive-class F1-score:
+Important caveat:
 
 ```text
-0.2361
-```
-
-Closest alternative:
-
-```text
-GAT with basic + ASA features
-Test F1 1 = 0.2338
+The combined experiment uses a larger and different natural test set, so it is not a direct one-to-one replacement for the current-only result. However, it demonstrates that expanding the dataset improves model behavior under a larger natural-test setting.
 ```
 
 ---
@@ -706,18 +739,16 @@ Test F1 1 = 0.2338
 ## 23. Current Conclusion
 
 - Multi-graph training works successfully.
-- Adding DBD-style complexes increased the number of positive samples to 698.
-- The dataset is still highly imbalanced.
-- GCN is conservative and often achieves higher accuracy.
-- GAT detects more positive interface/contact nodes.
-- In the strict setup, GAT with basic 3 features has the best positive-class F1-score.
-- Amino acid one-hot features increase recall but also increase false positives.
-- Physicochemical features are more compact and better than one-hot for GAT, but still below basic GAT.
-- ASA features improve GCN and produce a more precision-oriented GAT.
-- GAT hyperparameter tuning confirmed that the current baseline configuration is best.
-- Error analysis shows that false positives are the main issue.
-- Attention analysis provides local message-passing interpretation.
-- Structural visualization files allow TP/FP/FN residue pairs to be inspected in 3D.
+- The original current dataset is highly imbalanced.
+- GAT generally detects more positive interface/contact nodes than GCN.
+- The original best current-only strict model achieved F1 = 0.2361.
+- Random train balancing did not improve natural-test F1.
+- Hard negative mining increased recall in one setting but did not improve F1 due to increased false positives.
+- BM5-clean expansion increased usable complexes from 12 to 31.
+- Positive residue pairs increased from 698 to 1,794.
+- The combined current + BM5 experiment achieved F1 = 0.2791.
+- Dataset expansion is currently the most effective improvement path.
+- The next scientifically meaningful step is adding protein language model embeddings on top of the expanded dataset.
 
 ---
 
@@ -725,7 +756,9 @@ Test F1 1 = 0.2338
 
 Potential next steps:
 
-1. Try protein language model embeddings.
-2. Expand the dataset with more complexes.
-3. Prepare a final presentation/deck.
-4. Optionally inspect generated PyMOL visualizations manually.
+1. Add protein language model embeddings such as ESM-2.
+2. Evaluate ESM features on the combined current + BM5 dataset.
+3. Compare GAT with non-GNN baselines.
+4. Use cross-validation across complexes.
+5. Add edge features based on distance or residue geometry.
+6. Update the final presentation/deck with the BM5 expansion result.

@@ -244,11 +244,10 @@ Final input dimension:
 |---|---|---|---:|
 | Current-only strict baseline | 12 complexes | Basic 3 + GAT | 0.2361 |
 | Combined Current + BM5 | 31 complexes | Basic 3 + GAT | 0.2791 |
-| Combined Current + BM5 | Full Pair ESM-2 PCA16 + GAT | 0.2924 |
-| Combined Current + BM5 | Full Pair ESM-2 PCA16 + initial TransformerConv | 0.4134 |
-| Combined Current + BM5 | Full Pair ESM-2 PCA16 + tuned TransformerConv, threshold ≤ 0.60 | 0.5122 |
-| Combined Current + BM5 | Full Pair ESM-2 PCA16 + tuned TransformerConv, threshold ≤ 0.90 | **0.5962** |
-
+| Combined Current + BM5 | 31 complexes | Full Pair ESM-2 PCA16 + GAT | 0.2924 |
+| Combined Current + BM5 | 31 complexes | Full Pair ESM-2 PCA16 + initial TransformerConv | 0.4134 |
+| Combined Current + BM5 | 31 complexes | Full Pair ESM-2 PCA16 + tuned TransformerConv, threshold ≤ 0.60 | 0.5122 |
+| Combined Current + BM5 | 31 complexes | Full Pair ESM-2 PCA16 + tuned TransformerConv, threshold ≤ 0.90 | **0.5962** |
 ---
 
 ## GNN Architecture Comparison

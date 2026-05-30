@@ -2,7 +2,7 @@
 # Green = TP, Red = FP, Orange = FN
 
 reinitialize
-load data/raw_pdb/1FSS.pdb, 1FSS_A_B
+load ../../data/raw_pdb/1FSS.pdb, 1FSS_A_B
 
 hide everything
 show cartoon

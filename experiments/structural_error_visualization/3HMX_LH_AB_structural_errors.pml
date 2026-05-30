@@ -2,7 +2,7 @@
 # Green = TP, Red = FP, Orange = FN
 
 reinitialize
-load data/raw_pdb/3HMX.pdb, 3HMX_LH_AB
+load ../../data/raw_pdb/3HMX.pdb, 3HMX_LH_AB
 
 hide everything
 show cartoon

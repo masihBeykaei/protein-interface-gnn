@@ -38,6 +38,7 @@ Accuracy    = 0.9732
 - [How to Reproduce the Pipeline](#how-to-reproduce-the-pipeline)
 - [Important Output Files](#important-output-files)
 - [Interpretability and Error Analysis](#interpretability-and-error-analysis)
+- [Final Tuned TransformerConv Structural Visualization](#final-tuned-transformerconv-structural-visualization)
 - [Project Challenges and Solutions](#project-challenges-and-solutions)
 - [Limitations](#limitations)
 - [Future Work](#future-work)
@@ -666,6 +667,8 @@ experiments/gat_attention_summary.md
 experiments/gat_attention_refined_summary.md
 experiments/error_analysis_gat_basic_summary.md
 experiments/structural_error_visualization/
+experiments/generate_final_transformerconv_structural_visualization.py
+experiments/structural_error_visualization_final_transformerconv/
 ```
 
 ---
@@ -692,18 +695,77 @@ Attention weights are message-passing weights, not direct biological proof.
 
 ### Structural Error Visualization
 
-PyMOL scripts were generated to visualize:
+PyMOL scripts were generated to visualize selected residue-pair predictions in 3D structures.
 
 | Color | Meaning |
 |---|---|
 | Green | true positives |
 | Red | false positives |
 | Orange | false negatives |
+| Gray | complete protein complex |
 
-Generated scripts are stored under:
+The earlier current-only visualization files are stored under:
 
 ```text
 experiments/structural_error_visualization/
+```
+
+The final tuned TransformerConv visualization is stored separately under:
+
+```text
+experiments/structural_error_visualization_final_transformerconv/
+```
+
+This separation is intentional: the earlier directory documents the initial GAT/current-only analysis, while the final directory documents the final Combined Current + BM5 + ESM-2 PCA16 TransformerConv workflow.
+
+---
+
+## Final Tuned TransformerConv Structural Visualization
+
+The repository includes a dedicated script for qualitative 3D error analysis of the final model configuration:
+
+```text
+experiments/generate_final_transformerconv_structural_visualization.py
+```
+
+Run it from the repository root:
+
+```bash
+python experiments/generate_final_transformerconv_structural_visualization.py --processed_dir data/processed_combined_current_bm5_esm2_pca16 --out_dir experiments/structural_error_visualization_final_transformerconv --hidden_channels 16 --heads 4 --dropout 0.2 --lr 0.003 --weight_decay 0.001 --threshold_max 0.90 --seed 1 --top_k 10
+```
+
+The script evaluates the final test set:
+
+```text
+1BRS_A_B
+1FSS_A_B
+3HMX_LH_AB
+BM5_1A2K_A_B
+BM5_3BP8_A_B
+```
+
+For each test complex, it generates:
+
+```text
+<CASE>_final_transformerconv_structural_errors.pml
+<CASE>_final_transformerconv_structural_errors_clean.pml
+```
+
+It also generates:
+
+```text
+final_transformerconv_structural_error_examples.csv
+final_transformerconv_structural_error_visualization_summary.md
+```
+
+The full `.pml` files include selected pairwise C-alpha distance lines. The `_clean.pml` files remove the distance lines and are better suited for presentation figures.
+
+Important interpretation note:
+
+```text
+The visualization is qualitative.
+It shows selected top-k TP, FP, and FN residue-pair examples.
+It does not replace the official benchmark metrics or show every prediction.
 ```
 
 ---

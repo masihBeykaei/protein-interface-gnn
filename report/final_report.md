@@ -374,7 +374,78 @@ TP:         132 → 158
 
 ---
 
-## 17. Discussion
+## 17. Final Tuned TransformerConv Structural Visualization
+
+After selecting the final tuned TransformerConv configuration, a dedicated PyMOL structural error visualization workflow was added for the final Combined Current + BM5 + ESM-2 PCA16 test protocol.
+
+The visualization script is:
+
+```text
+experiments/generate_final_transformerconv_structural_visualization.py
+```
+
+It runs the same final model family and preprocessing configuration used in the final evaluation:
+
+```text
+Model family: Tuned TransformerConv
+Dataset: Combined Current + BM5
+Features: Basic 3 + Full Pair ESM-2 PCA16
+Input dimension: 19
+hidden_channels = 16
+heads = 4
+dropout = 0.2
+learning rate = 0.003
+weight decay = 0.001
+threshold_max = 0.90
+seed = 1
+```
+
+The final visualization covers the held-out natural test complexes:
+
+```text
+1BRS_A_B
+1FSS_A_B
+3HMX_LH_AB
+BM5_1A2K_A_B
+BM5_3BP8_A_B
+```
+
+The script generates two PyMOL files per complex:
+
+```text
+<CASE>_final_transformerconv_structural_errors.pml
+<CASE>_final_transformerconv_structural_errors_clean.pml
+```
+
+The full version contains selected pairwise C-alpha distance lines. The clean version removes the distance lines and is intended for presentation screenshots.
+
+It also generates:
+
+```text
+final_transformerconv_structural_error_examples.csv
+final_transformerconv_structural_error_visualization_summary.md
+```
+
+### PyMOL Color Legend
+
+| Color | Meaning |
+|---|---|
+| Green | selected true-positive residue-pair examples |
+| Red | selected false-positive residue-pair examples |
+| Orange | selected false-negative residue-pair examples |
+| Gray | complete protein complex cartoon |
+
+This analysis is qualitative. It does not replace the official final test metrics and does not necessarily display every model prediction. Instead, it provides a structural view of representative successes, over-predictions, and missed contacts.
+
+Command:
+
+```bash
+python experiments/generate_final_transformerconv_structural_visualization.py --processed_dir data/processed_combined_current_bm5_esm2_pca16 --out_dir experiments/structural_error_visualization_final_transformerconv --hidden_channels 16 --heads 4 --dropout 0.2 --lr 0.003 --weight_decay 0.001 --threshold_max 0.90 --seed 1 --top_k 10
+```
+
+---
+
+## 18. Discussion
 
 The final results show a clear progression:
 
@@ -388,7 +459,7 @@ The most important final observation is that threshold optimization was not a co
 
 ---
 
-## 18. Limitations
+## 19. Limitations
 
 Important limitations remain:
 
@@ -403,7 +474,7 @@ Important limitations remain:
 
 ---
 
-## 19. Future Work
+## 20. Future Work
 
 Recommended future improvements:
 
@@ -419,7 +490,7 @@ Recommended future improvements:
 
 ---
 
-## 20. Conclusion
+## 21. Conclusion
 
 This project built a complete GNN-based pipeline for protein–protein interface prediction.
 

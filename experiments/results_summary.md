@@ -311,7 +311,72 @@ Confusion matrix:
 
 ---
 
-## 13. Final Conclusion
+## 13. Final Tuned TransformerConv Structural Visualization
+
+A dedicated structural error visualization workflow was added for the final tuned TransformerConv configuration.
+
+### Purpose
+
+The purpose is to complement the numerical benchmark with qualitative 3D inspection of selected residue-pair predictions.
+
+```text
+Model family: Tuned TransformerConv
+Dataset: Combined Current + BM5
+Features: Basic 3 + Full Pair ESM-2 PCA16
+Input dimension: 19
+Visualization threshold search max: 0.90
+Default visualization seed: 1
+Top examples per category: 10
+```
+
+### Final Test Complexes
+
+```text
+1BRS_A_B
+1FSS_A_B
+3HMX_LH_AB
+BM5_1A2K_A_B
+BM5_3BP8_A_B
+```
+
+### Command
+
+```bash
+python experiments/generate_final_transformerconv_structural_visualization.py --processed_dir data/processed_combined_current_bm5_esm2_pca16 --out_dir experiments/structural_error_visualization_final_transformerconv --hidden_channels 16 --heads 4 --dropout 0.2 --lr 0.003 --weight_decay 0.001 --threshold_max 0.90 --seed 1 --top_k 10
+```
+
+### Generated Outputs
+
+```text
+experiments/structural_error_visualization_final_transformerconv/
+├── <CASE>_final_transformerconv_structural_errors.pml
+├── <CASE>_final_transformerconv_structural_errors_clean.pml
+├── final_transformerconv_structural_error_examples.csv
+└── final_transformerconv_structural_error_visualization_summary.md
+```
+
+### PyMOL Legend
+
+| Color | Meaning |
+|---|---|
+| Green | selected true-positive residue pairs |
+| Red | selected false-positive residue pairs |
+| Orange | selected false-negative residue pairs |
+| Gray | complete protein complex cartoon |
+
+The full PML files show selected residue-pair distance lines. The clean PML files are intended for presentation screenshots.
+
+Important note:
+
+```text
+This is a qualitative analysis workflow.
+It visualizes selected top-k TP, FP, and FN examples.
+The official final benchmark result remains F1 = 0.5962.
+```
+
+---
+
+## 14. Final Conclusion
 
 The final model improves substantially over all earlier baselines.
 
